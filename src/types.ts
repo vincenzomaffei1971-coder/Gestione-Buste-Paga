@@ -15,6 +15,10 @@ export interface Worker {
   surname: string;
   cf: string;
   relationshipNumber: string;
+  title: string;
+  employerName: string;
+  employerSurname: string;
+  employerCf: string;
 }
 
 export interface PayrollEntry {

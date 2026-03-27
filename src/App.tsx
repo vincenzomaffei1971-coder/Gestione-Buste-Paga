@@ -487,10 +487,30 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
   const [loading, setLoading] = useState(true);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollEntry | null>(null);
   const [selectedYear, setSelectedYear] = useState(2026);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   // Form states
-  const [newWorker, setNewWorker] = useState({ name: '', surname: '', cf: '', relationshipNumber: '' });
-  const [newPayroll, setNewPayroll] = useState({ year: 2026, month: 'Marzo', hourlyRate: 9, hoursWorked: 0 });
+  const [newWorker, setNewWorker] = useState({ 
+    name: '', 
+    surname: '', 
+    cf: '', 
+    relationshipNumber: '', 
+    title: '',
+    employerName: profile.name || '',
+    employerSurname: profile.surname || '',
+    employerCf: profile.cf || ''
+  });
+  const [newPayroll, setNewPayroll] = useState({ year: 2026, month: 'Marzo', hourlyRate: 10, hoursWorked: 0 });
+  const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNewWorker(prev => ({
+      ...prev,
+      employerName: profile.name || '',
+      employerSurname: profile.surname || '',
+      employerCf: profile.cf || ''
+    }));
+  }, [profile]);
 
   useEffect(() => {
     const q = query(collection(db, 'workers'), where('managerId', '==', user.uid));
@@ -518,13 +538,32 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
 
   const handleAddWorker = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
+    // Uniqueness check for relationshipNumber
+    const isDuplicate = workers.some(w => w.relationshipNumber === newWorker.relationshipNumber);
+    if (isDuplicate) {
+      setFormError("Il numero rapporto deve essere univoco. Esiste già un lavoratore con questo numero.");
+      return;
+    }
+
     try {
       await addDoc(collection(db, 'workers'), {
         ...newWorker,
         managerId: user.uid,
-        cf: newWorker.cf.toUpperCase()
+        cf: newWorker.cf.toUpperCase(),
+        employerCf: newWorker.employerCf.toUpperCase()
       });
-      setNewWorker({ name: '', surname: '', cf: '', relationshipNumber: '' });
+      setNewWorker({ 
+        name: '', 
+        surname: '', 
+        cf: '', 
+        relationshipNumber: '', 
+        title: '',
+        employerName: profile.name || '',
+        employerSurname: profile.surname || '',
+        employerCf: profile.cf || ''
+      });
       setView('list');
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'workers');
@@ -551,10 +590,13 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
   };
 
   const deleteWorker = async (id: string) => {
-    // In a real app we'd use a custom modal. For now, we'll just proceed or use a simple state.
-    // Given the iframe restriction, we'll skip the native confirm.
+    if (showDeleteConfirm !== id) {
+      setShowDeleteConfirm(id);
+      return;
+    }
     try {
       await deleteDoc(doc(db, 'workers', id));
+      setShowDeleteConfirm(null);
       setView('list');
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `workers/${id}`);
@@ -680,17 +722,27 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
                       className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 cursor-pointer group"
                       onClick={() => { setSelectedWorker(worker); setView('worker'); }}
                     >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="w-12 h-12 bg-zinc-50 rounded-2xl flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-                          <UserIcon className="w-6 h-6" />
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-zinc-50 rounded-2xl flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors shrink-0">
+                            <UserIcon className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-medium tracking-tight text-zinc-900 leading-tight">{worker.title}</h3>
+                            <p className="text-xs text-zinc-500">{worker.name} {worker.surname}</p>
+                          </div>
                         </div>
                         <ChevronRight className="w-5 h-5 text-zinc-300 group-hover:text-black transition-colors" />
                       </div>
-                      <h3 className="text-xl font-medium mb-1">{worker.name} {worker.surname}</h3>
-                      <p className="text-xs text-zinc-400 uppercase tracking-widest mb-4">{worker.cf}</p>
                       <div className="flex items-center justify-between pt-4 border-t border-zinc-50">
-                        <span className="text-[10px] uppercase tracking-widest text-zinc-400">Nr Rapporto</span>
-                        <span className="text-sm font-mono">{worker.relationshipNumber}</span>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] uppercase tracking-widest text-zinc-400">Codice Fiscale</span>
+                          <span className="text-xs font-mono">{worker.cf}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] uppercase tracking-widest text-zinc-400">Nr Rapporto</span>
+                          <span className="text-sm font-mono">{worker.relationshipNumber}</span>
+                        </div>
                       </div>
                     </motion.div>
                   ))}
@@ -713,9 +765,24 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
               <h1 className="text-4xl font-light tracking-tight mb-8">Nuovo Lavoratore</h1>
               
               <form onSubmit={handleAddWorker} className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100 space-y-6">
+                {formError && (
+                  <div className="bg-red-50 text-red-500 p-4 rounded-xl text-sm">
+                    {formError}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Titolo Rapporto (es. Colf, Badante, Giardiniere)</label>
+                  <input 
+                    required
+                    value={newWorker.title}
+                    onChange={e => setNewWorker({...newWorker, title: e.target.value})}
+                    className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
+                    placeholder="Es. Colf Part-time"
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Nome</label>
+                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Nome Lavoratore</label>
                     <input 
                       required
                       value={newWorker.name}
@@ -724,7 +791,7 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
                     />
                   </div>
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Cognome</label>
+                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Cognome Lavoratore</label>
                     <input 
                       required
                       value={newWorker.surname}
@@ -734,7 +801,7 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Codice Fiscale</label>
+                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Codice Fiscale Lavoratore</label>
                   <input 
                     required
                     maxLength={16}
@@ -744,6 +811,41 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
                     placeholder="RSSMRA80A01H501Z"
                   />
                 </div>
+
+                <div className="pt-6 border-t border-zinc-100">
+                  <h3 className="text-sm font-medium mb-4">Dati Datore di Lavoro</h3>
+                  <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Nome Datore</label>
+                      <input 
+                        required
+                        value={newWorker.employerName}
+                        onChange={e => setNewWorker({...newWorker, employerName: e.target.value})}
+                        className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Cognome Datore</label>
+                      <input 
+                        required
+                        value={newWorker.employerSurname}
+                        onChange={e => setNewWorker({...newWorker, employerSurname: e.target.value})}
+                        className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Codice Fiscale Datore</label>
+                    <input 
+                      required
+                      maxLength={16}
+                      value={newWorker.employerCf}
+                      onChange={e => setNewWorker({...newWorker, employerCf: e.target.value})}
+                      className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none uppercase"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Nr Rapporto</label>
                   <input 
@@ -773,15 +875,35 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
                   <button onClick={() => setView('list')} className="text-zinc-400 hover:text-black mb-4 flex items-center gap-2 text-sm">
                     ← Torna alla lista
                   </button>
-                  <h1 className="text-4xl font-light tracking-tight">{selectedWorker.name} {selectedWorker.surname}</h1>
-                  <p className="text-zinc-500 mt-1">Gestione buste paga e documenti annuali.</p>
+                  <h1 className="text-4xl font-light tracking-tight">{selectedWorker.title}</h1>
+                  <p className="text-zinc-500 mt-1">{selectedWorker.name} {selectedWorker.surname} — Nr. Rapporto: {selectedWorker.relationshipNumber}</p>
                 </div>
-                <button 
-                  onClick={() => deleteWorker(selectedWorker.id)}
-                  className="text-red-400 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {showDeleteConfirm === selectedWorker.id ? (
+                    <div className="flex items-center gap-2 bg-red-50 p-1 rounded-xl">
+                      <span className="text-[10px] text-red-500 font-medium px-2 uppercase tracking-widest">Confermi?</span>
+                      <button 
+                        onClick={() => deleteWorker(selectedWorker.id)}
+                        className="bg-red-500 text-white px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-colors"
+                      >
+                        Sì, elimina
+                      </button>
+                      <button 
+                        onClick={() => setShowDeleteConfirm(null)}
+                        className="bg-zinc-200 text-zinc-600 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-300 transition-colors"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => setShowDeleteConfirm(selectedWorker.id)}
+                      className="text-red-400 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
@@ -932,16 +1054,58 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
 
                     {/* TFR Card */}
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
-                      <div className="w-10 h-10 bg-zinc-50 rounded-xl flex items-center justify-center mb-4">
-                        <History className="w-5 h-5 text-zinc-500" />
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-medium flex items-center gap-2">
+                          <History className="w-4 h-4 text-zinc-400" />
+                          Prospetto TFR
+                        </h3>
+                        <span className="text-xs font-mono font-bold bg-zinc-100 px-2 py-1 rounded-lg">
+                          {payroll.reduce((acc, p) => acc + p.tfr, 0).toFixed(2)}€
+                        </span>
                       </div>
-                      <h3 className="text-lg font-medium mb-2">Prospetto TFR</h3>
-                      <p className="text-sm text-zinc-400 mb-6">Visualizza l'accantonamento totale maturato.</p>
-                      <div className="p-4 bg-zinc-50 rounded-2xl">
-                        <div className="flex justify-between items-center text-xs mb-1">
-                          <span className="text-zinc-400 uppercase tracking-widest">Totale Maturato</span>
-                          <span className="font-mono font-medium">{payroll.reduce((acc, p) => acc + p.tfr, 0).toFixed(2)}€</span>
-                        </div>
+                      <p className="text-[10px] text-zinc-400 leading-relaxed">
+                        Accantonamento totale maturato calcolato sulla base dei periodi inseriti.
+                      </p>
+                    </div>
+
+                    {/* Payroll History */}
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 mt-8">
+                      <h3 className="text-sm font-medium mb-6 flex items-center gap-2">
+                        <History className="w-4 h-4" />
+                        Storico Buste Paga
+                      </h3>
+                      <div className="space-y-2">
+                        {payroll.length === 0 ? (
+                          <p className="text-xs text-zinc-400 italic text-center py-4">Nessun dato storico trovato.</p>
+                        ) : (
+                          payroll
+                            .sort((a, b) => {
+                              if (a.year !== b.year) return b.year - a.year;
+                              return MONTHS.indexOf(b.month) - MONTHS.indexOf(a.month);
+                            })
+                            .map(p => (
+                              <div key={p.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-xl group hover:bg-zinc-100 transition-colors">
+                                <div>
+                                  <p className="text-xs font-medium">{p.month} {p.year}</p>
+                                  <p className="text-[10px] text-zinc-400">{p.hoursWorked}h @ {p.hourlyRate}€/h</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button 
+                                    onClick={() => { setSelectedPayroll(p); setView('print-payslip'); }}
+                                    className="p-2 text-zinc-400 hover:text-black transition-colors"
+                                  >
+                                    <Printer className="w-3 h-3" />
+                                  </button>
+                                  <button 
+                                    onClick={() => deletePayroll(p.id)}
+                                    className="p-2 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                        )}
                       </div>
                     </div>
                   </div>
@@ -961,63 +1125,64 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
                 ← Torna al lavoratore
               </button>
               
-              <div className="bg-white p-12 border border-black shadow-sm font-serif text-black">
-                <div className="text-center mb-8">
-                  <h2 className="text-2xl font-bold uppercase tracking-widest">Prospetto Paga</h2>
-                  <p className="text-sm mt-1">Periodo: {selectedPayroll.month} {selectedPayroll.year}</p>
+              <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
+                <div className="flex justify-between items-start mb-12">
+                  <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center print:bg-zinc-100 print:text-black">
+                    <Briefcase className="text-white w-6 h-6 print:text-black" />
+                  </div>
+                  <div className="text-right">
+                    <h2 className="text-2xl font-bold uppercase tracking-tighter">Prospetto Paga</h2>
+                    <p className="text-sm text-zinc-500">Periodo: {selectedPayroll.month} {selectedPayroll.year}</p>
+                  </div>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-12 mb-12 border-y border-black py-6">
+                <div className="grid grid-cols-2 gap-12 mb-12 border-y border-zinc-100 py-8 print:border-zinc-200">
                   <div>
-                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Datore di Lavoro</h4>
-                    <p className="font-bold">{profile.name} {profile.surname}</p>
-                    <p className="text-sm font-mono">{profile.cf}</p>
+                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-3">Datore di Lavoro</h4>
+                    <p className="text-lg font-bold leading-tight">{selectedWorker.employerName} {selectedWorker.employerSurname}</p>
+                    <p className="text-sm font-mono text-zinc-500 mt-1">{selectedWorker.employerCf}</p>
                   </div>
                   <div>
-                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Lavoratore</h4>
-                    <p className="font-bold">{selectedWorker.name} {selectedWorker.surname}</p>
-                    <p className="text-sm font-mono">{selectedWorker.cf}</p>
-                    <p className="text-xs mt-1 italic">Nr Rapporto: {selectedWorker.relationshipNumber}</p>
+                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-3">Lavoratore</h4>
+                    <p className="text-lg font-bold leading-tight">{selectedWorker.name} {selectedWorker.surname}</p>
+                    <p className="text-sm font-mono text-zinc-500 mt-1">{selectedWorker.cf}</p>
+                    <div className="mt-3 inline-block px-2 py-1 bg-zinc-50 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-500 border border-zinc-100">
+                      Nr Rapporto: {selectedWorker.relationshipNumber}
+                    </div>
                   </div>
                 </div>
 
-                <table className="w-full mb-12">
-                  <thead>
-                    <tr className="border-b border-black text-left text-xs uppercase tracking-widest">
-                      <th className="py-2">Voce</th>
-                      <th className="py-2 text-right">Valore</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    <tr>
-                      <td className="py-3">Ore lavorate nel mese</td>
-                      <td className="py-3 text-right font-mono">{selectedPayroll.hoursWorked} h</td>
-                    </tr>
-                    <tr>
-                      <td className="py-3">Retribuzione oraria</td>
-                      <td className="py-3 text-right font-mono">{selectedPayroll.hourlyRate.toFixed(2)} €/h</td>
-                    </tr>
-                    <tr className="font-bold border-t border-black">
-                      <td className="py-3">Totale Lordo</td>
-                      <td className="py-3 text-right font-mono">{selectedPayroll.grossPay.toFixed(2)} €</td>
-                    </tr>
-                    <tr>
-                      <td className="py-3">Rateo Tredicesima</td>
-                      <td className="py-3 text-right font-mono">{selectedPayroll.thirteenth.toFixed(2)} €</td>
-                    </tr>
-                    <tr className="text-zinc-400 italic">
-                      <td className="py-3">Accantonamento TFR (pro-quota)</td>
-                      <td className="py-3 text-right font-mono">{selectedPayroll.tfr.toFixed(2)} €</td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <div className="flex justify-between items-end mt-24">
-                  <div className="border-t border-black pt-2 w-48 text-center text-xs">
-                    Firma per ricevuta
+                <div className="space-y-1 mb-12">
+                  <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
+                    <span className="text-zinc-500">Ore lavorate nel mese</span>
+                    <span className="font-mono font-medium">{selectedPayroll.hoursWorked} h</span>
                   </div>
-                  <div className="text-xs">
-                    Data: ___/___/______
+                  <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
+                    <span className="text-zinc-500">Retribuzione oraria</span>
+                    <span className="font-mono font-medium">{selectedPayroll.hourlyRate.toFixed(2)} €/h</span>
+                  </div>
+                  <div className="flex justify-between py-4 border-b border-zinc-100 text-base font-bold">
+                    <span>Totale Lordo</span>
+                    <span className="font-mono">{selectedPayroll.grossPay.toFixed(2)} €</span>
+                  </div>
+                  <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
+                    <span className="text-zinc-500">Rateo Tredicesima</span>
+                    <span className="font-mono font-medium">{selectedPayroll.thirteenth.toFixed(2)} €</span>
+                  </div>
+                  <div className="flex justify-between py-3 text-sm italic text-zinc-400">
+                    <span>Accantonamento TFR (pro-quota)</span>
+                    <span className="font-mono">{selectedPayroll.tfr.toFixed(2)} €</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-12 mt-24">
+                  <div className="space-y-8">
+                    <div className="text-[10px] uppercase tracking-widest text-zinc-400">Data e Luogo</div>
+                    <div className="border-b border-zinc-200 w-full h-8"></div>
+                  </div>
+                  <div className="space-y-8">
+                    <div className="text-[10px] uppercase tracking-widest text-zinc-400 text-center">Firma per ricevuta</div>
+                    <div className="border-b border-zinc-200 w-full h-8"></div>
                   </div>
                 </div>
               </div>
@@ -1048,45 +1213,54 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
               {(() => {
                 const totals = getAnnualTotals(selectedYear);
                 return (
-                  <div className="bg-white p-12 border-2 border-zinc-800 shadow-sm font-serif text-black">
-                    <div className="text-center mb-12">
-                      <h2 className="text-3xl font-bold uppercase">Dichiarazione Sostitutiva di Certificazione</h2>
-                      <p className="text-sm mt-2 italic">Ai sensi dell'art. 4 comma 6-ter del DPR 322/1998</p>
-                      <p className="text-xl mt-4 font-bold">Anno d'imposta: {selectedYear}</p>
+                  <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
+                    <div className="flex justify-between items-start mb-12">
+                      <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center print:bg-zinc-100 print:text-black">
+                        <Briefcase className="text-white w-6 h-6 print:text-black" />
+                      </div>
+                      <div className="text-right">
+                        <h2 className="text-2xl font-bold uppercase tracking-tighter">Certificazione Unica</h2>
+                        <p className="text-sm text-zinc-500">Anno d'imposta: {selectedYear}</p>
+                      </div>
                     </div>
 
-                    <div className="space-y-6 text-sm leading-relaxed mb-12">
-                      <p>Il sottoscritto <strong>{profile.name} {profile.surname}</strong> (CF: {profile.cf}), in qualità di datore di lavoro,</p>
+                    <div className="space-y-6 text-sm leading-relaxed mb-12 text-zinc-700">
+                      <p>Il sottoscritto <strong>{selectedWorker.employerName} {selectedWorker.employerSurname}</strong> (CF: {selectedWorker.employerCf}), in qualità di datore di lavoro,</p>
                       <p>CERTIFICA che il lavoratore <strong>{selectedWorker.name} {selectedWorker.surname}</strong> (CF: {selectedWorker.cf}), rapporto nr. {selectedWorker.relationshipNumber}, ha percepito nell'anno {selectedYear} le seguenti somme:</p>
                     </div>
 
-                    <table className="w-full border border-black mb-12">
-                      <tbody className="text-sm">
-                        <tr className="border-b border-black">
-                          <td className="p-4">Somme erogate a titolo di retribuzione lorda</td>
-                          <td className="p-4 text-right font-mono">{totals.totGross.toFixed(2)} €</td>
-                        </tr>
-                        <tr className="border-b border-black">
-                          <td className="p-4">Somme erogate a titolo di 13esima mensilità</td>
-                          <td className="p-4 text-right font-mono">{totals.totThirteenth.toFixed(2)} €</td>
-                        </tr>
-                        <tr className="bg-zinc-50 font-bold">
-                          <td className="p-4">TOTALE REDDITO LORDO (CU)</td>
-                          <td className="p-4 text-right font-mono">{totals.totalCU.toFixed(2)} €</td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    <div className="p-4 border border-zinc-200 rounded-lg mb-12">
-                      <p className="text-sm italic">Somme accantonate a titolo di T.F.R. nell'anno: <strong>{totals.totTfr.toFixed(2)} €</strong></p>
+                    <div className="border border-zinc-100 rounded-3xl overflow-hidden mb-12">
+                      <div className="flex justify-between p-6 border-b border-zinc-50 bg-zinc-50/50">
+                        <span className="text-xs uppercase tracking-widest text-zinc-400">Descrizione</span>
+                        <span className="text-xs uppercase tracking-widest text-zinc-400">Importo</span>
+                      </div>
+                      <div className="flex justify-between p-6 border-b border-zinc-50 text-sm">
+                        <span>Somme erogate a titolo di retribuzione lorda</span>
+                        <span className="font-mono font-medium">{totals.totGross.toFixed(2)} €</span>
+                      </div>
+                      <div className="flex justify-between p-6 border-b border-zinc-50 text-sm">
+                        <span>Somme erogate a titolo di 13esima mensilità</span>
+                        <span className="font-mono font-medium">{totals.totThirteenth.toFixed(2)} €</span>
+                      </div>
+                      <div className="flex justify-between p-6 bg-black text-white font-bold">
+                        <span className="uppercase tracking-widest text-xs">Totale Reddito Lordo (CU)</span>
+                        <span className="font-mono text-lg">{totals.totalCU.toFixed(2)} €</span>
+                      </div>
                     </div>
 
-                    <div className="flex justify-between items-end mt-24">
-                      <div className="text-sm">
-                        Data: {new Date().toLocaleDateString('it-IT')}
+                    <div className="p-6 bg-zinc-50 rounded-3xl mb-12 flex justify-between items-center">
+                      <span className="text-xs uppercase tracking-widest text-zinc-400">Accantonamento T.F.R. nell'anno</span>
+                      <span className="font-mono font-bold text-zinc-900">{totals.totTfr.toFixed(2)} €</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-12 mt-24">
+                      <div className="space-y-8">
+                        <div className="text-[10px] uppercase tracking-widest text-zinc-400">Data e Luogo</div>
+                        <div className="border-b border-zinc-200 w-full h-8"></div>
                       </div>
-                      <div className="border-t border-black pt-2 w-64 text-center text-xs">
-                        Firma del Datore di Lavoro
+                      <div className="space-y-8">
+                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 text-center">Firma del Datore di Lavoro</div>
+                        <div className="border-b border-zinc-200 w-full h-8"></div>
                       </div>
                     </div>
                   </div>
