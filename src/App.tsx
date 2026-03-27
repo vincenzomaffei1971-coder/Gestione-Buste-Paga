@@ -171,7 +171,16 @@ testConnection();
 
 // --- COMPONENTS ---
 
-const ADMIN_EMAILS = ['vincenzomaffei1971@gmail.com', 'vincenzo.maffei@gmail.com'];
+const ADMIN_EMAILS = [
+  'vincenzomaffei1971@gmail.com', 
+  'vincenzo.maffei@gmail.com', 
+  'vincenzo.maffei-1971@gmail.com'
+];
+
+const isProtectedEmail = (email: string | null | undefined) => {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email);
+};
 
 const Login = () => {
   const [error, setError] = useState('');
@@ -267,7 +276,7 @@ const ProfileSetup = ({ user, onComplete }: { user: User, onComplete: () => void
         surname,
         cf: cf.toUpperCase(),
         email: user.email,
-        isApproved: ADMIN_EMAILS.includes(user.email || '')
+        isApproved: isProtectedEmail(user.email)
       });
       onComplete();
     } catch (error) {
@@ -387,7 +396,8 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
     return () => { unsubPending(); unsubApproved(); };
   }, []);
 
-  const toggleApproval = async (uid: string, status: boolean) => {
+  const toggleApproval = async (uid: string, email: string, status: boolean) => {
+    if (isProtectedEmail(email)) return;
     try {
       await setDoc(doc(db, 'users', uid), { isApproved: status }, { merge: true });
     } catch (error) {
@@ -395,7 +405,11 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
     }
   };
 
-  const deleteUser = async (uid: string) => {
+  const deleteUser = async (uid: string, email: string) => {
+    if (isProtectedEmail(email)) {
+      alert("Questo utente è un amministratore di sistema e non può essere rimosso.");
+      return;
+    }
     if (!window.confirm("Sei sicuro di voler eliminare definitivamente questo utente? Tutti i suoi dati rimarranno nel database ma non potrà più accedere.")) return;
     try {
       await deleteDoc(doc(db, 'users', uid));
@@ -445,7 +459,7 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
               <Plus className="w-4 h-4" />
               Aggiungi Utente
             </button>
-            {ADMIN_EMAILS.includes(user.email || '') && (
+            {isProtectedEmail(user.email) && (
               <button 
                 onClick={onSwitch}
                 className="flex items-center gap-2 text-zinc-500 text-sm font-medium hover:text-black transition-colors"
@@ -526,17 +540,19 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
                       </div>
                       <div className="flex gap-3">
                         <button 
-                          onClick={() => toggleApproval(u.uid, true)}
+                          onClick={() => toggleApproval(u.uid, u.email, true)}
                           className="bg-black text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors"
                         >
                           Approva
                         </button>
-                        <button 
-                          onClick={() => deleteUser(u.uid)}
-                          className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!isProtectedEmail(u.email) && (
+                          <button 
+                            onClick={() => deleteUser(u.uid, u.email)}
+                            className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -554,21 +570,24 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
                       <p className="text-sm text-zinc-500">{u.email}</p>
                     </div>
                     <div className="flex items-center gap-4">
-                      {u.email !== user.email && (
+                      {!isProtectedEmail(u.email) && (
                         <>
                           <button 
-                            onClick={() => toggleApproval(u.uid, false)}
+                            onClick={() => toggleApproval(u.uid, u.email, false)}
                             className="text-zinc-500 text-sm font-medium hover:underline"
                           >
                             Revoca Accesso
                           </button>
                           <button 
-                            onClick={() => deleteUser(u.uid)}
+                            onClick={() => deleteUser(u.uid, u.email)}
                             className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </>
+                      )}
+                      {isProtectedEmail(u.email) && (
+                        <span className="text-xs uppercase tracking-widest text-zinc-400 font-medium">Admin di Sistema</span>
                       )}
                     </div>
                   </div>
@@ -749,7 +768,7 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
               <Plus className="w-4 h-4" />
               Nuovo Lavoratore
             </button>
-            {ADMIN_EMAILS.includes(profile.email) && (
+            {isProtectedEmail(profile.email) && (
               <button 
                 onClick={onSwitchAdmin}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-zinc-500 hover:bg-zinc-50 transition-colors"
@@ -1465,7 +1484,7 @@ function AppContent() {
   if (!user) return <Login />;
   if (!profile) return <ProfileSetup user={user} onComplete={() => window.location.reload()} />;
 
-  const isAdmin = ADMIN_EMAILS.includes(user.email || '');
+  const isAdmin = isProtectedEmail(user.email);
 
   if (!profile.isApproved && !isAdmin) {
     return <WaitingForApproval onSignOut={() => signOut(auth)} />;
