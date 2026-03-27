@@ -2,7 +2,7 @@
 setlocal
 cd /d %~dp0
 echo ==================================================
-echo   AVVIO GESTIONALE COLF ^& BADANTI
+echo   AVVIO GESTIONALE BUSTA PAGA COLF
 echo ==================================================
 echo.
 

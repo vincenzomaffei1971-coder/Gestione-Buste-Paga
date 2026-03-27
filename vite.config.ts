@@ -7,14 +7,17 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
+    // Se l'app viene ospitata su GitLab Pages (es. username.gitlab.io/project-name/),
+    // decommenta la riga sotto e inserisci il nome del progetto:
+    // base: '/nome-progetto-gitlab/',
     plugins: [
       react(), 
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
-          name: 'Gestionale Colf & Badanti',
-          short_name: 'ColfApp',
+          name: 'Gestionale Busta Paga Colf',
+          short_name: 'BustaPagaColf',
           description: 'Gestione buste paga e TFR per colf e badanti',
           theme_color: '#000000',
           background_color: '#f5f5f5',
