@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: uid
+    // Fields:
+    //   - name: string (required)
+    //   - surname: string (required)
+    //   - cf: string (required)
+    //
+    // Collection: workers
+    // Document ID: workerId
+    // Fields:
+    //   - managerId: string (required)
+    //   - name: string (required)
+    //   - surname: string (required)
+    //   - cf: string (required)
+    //   - relationshipNumber: string (required)
+    //
+    // Collection: payroll
+    // Document ID: payrollId
+    // Fields:
+    //   - workerId: string (required)
+    //   - managerId: string (required)
+    //   - year: number (required)
+    //   - month: string (required)
+    //   - hourlyRate: number (required)
+    //   - hoursWorked: number (required)
+    //   - grossPay: number (required)
+    //   - thirteenth: number (required)
+    //   - tfr: number (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          ((request.auth.token.email == "vincenzomaffei1971@gmail.com" || request.auth.token.email == "vincenzo.maffei@gmail.com") && request.auth.token.email_verified == true));
+    }
+
+    function isApproved() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true || isAdmin());
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'surname', 'cf', 'email', 'isApproved']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.surname is string && data.surname.size() > 0 && data.surname.size() < 100 &&
+             data.cf is string && data.cf.size() == 16 &&
+             data.email is string &&
+             data.isApproved is bool;
+    }
+
+    function isValidWorker(data) {
+      return isApproved() &&
+             data.keys().hasAll(['managerId', 'name', 'surname', 'cf', 'relationshipNumber']) &&
+             data.managerId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.surname is string && data.surname.size() > 0 && data.surname.size() < 100 &&
+             data.cf is string && data.cf.size() == 16 &&
+             data.relationshipNumber is string && data.relationshipNumber.size() > 0;
+    }
+
+    function isValidPayroll(data) {
+      return isApproved() &&
+             data.keys().hasAll(['workerId', 'managerId', 'year', 'month', 'hourlyRate', 'hoursWorked', 'grossPay', 'thirteenth', 'tfr']) &&
+             data.managerId == request.auth.uid &&
+             data.workerId is string &&
+             data.year is number && data.year >= 2000 && data.year <= 2100 &&
+             data.month is string &&
+             data.hourlyRate is number && data.hourlyRate >= 0 &&
+             data.hoursWorked is number && data.hoursWorked >= 0 &&
+             data.grossPay is number && data.grossPay >= 0 &&
+             data.thirteenth is number && data.thirteenth >= 0 &&
+             data.tfr is number && data.tfr >= 0;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.isApproved == false;
+      allow update: if (isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.isApproved == resource.data.isApproved) || isAdmin();
+    }
+
+    match /workers/{workerId} {
+      allow read: if isApproved() && (resource.data.managerId == request.auth.uid || isAdmin());
+      allow create: if isApproved() && isValidWorker(request.resource.data);
+      allow update: if isApproved() && (resource.data.managerId == request.auth.uid && isValidWorker(request.resource.data)) || isAdmin();
+      allow delete: if isApproved() && (resource.data.managerId == request.auth.uid || isAdmin());
+    }
+
+    match /payroll/{payrollId} {
+      allow read: if isApproved() && (resource.data.managerId == request.auth.uid || isAdmin());
+      allow create: if isApproved() && isValidPayroll(request.resource.data);
+      allow update: if isApproved() && (resource.data.managerId == request.auth.uid && isValidPayroll(request.resource.data)) || isAdmin();
+      allow delete: if isApproved() && (resource.data.managerId == request.auth.uid || isAdmin());
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

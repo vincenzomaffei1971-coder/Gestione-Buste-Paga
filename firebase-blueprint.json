@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "User": {
+      "title": "User (Manager)",
+      "description": "A manager who manages domestic workers.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "surname": { "type": "string" },
+        "cf": { "type": "string", "description": "Fiscal Code (Codice Fiscale)" },
+        "email": { "type": "string" },
+        "isApproved": { "type": "boolean", "default": false }
+      },
+      "required": ["uid", "name", "surname", "cf", "email", "isApproved"]
+    },
+    "Worker": {
+      "title": "Worker (COLF/Badante)",
+      "description": "A domestic worker managed by a manager.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "managerId": { "type": "string" },
+        "name": { "type": "string" },
+        "surname": { "type": "string" },
+        "cf": { "type": "string", "description": "Fiscal Code (Codice Fiscale)" },
+        "relationshipNumber": { "type": "string", "description": "Nr Rapporto" }
+      },
+      "required": ["id", "managerId", "name", "surname", "cf", "relationshipNumber"]
+    },
+    "Payroll": {
+      "title": "Payroll Entry",
+      "description": "A monthly payroll entry for a worker.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workerId": { "type": "string" },
+        "managerId": { "type": "string" },
+        "year": { "type": "integer" },
+        "month": { "type": "string" },
+        "hourlyRate": { "type": "number" },
+        "hoursWorked": { "type": "number" },
+        "grossPay": { "type": "number" },
+        "thirteenth": { "type": "number" },
+        "tfr": { "type": "number" }
+      },
+      "required": ["id", "workerId", "managerId", "year", "month", "hourlyRate", "hoursWorked", "grossPay", "thirteenth", "tfr"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profile data."
+    },
+    "/workers/{workerId}": {
+      "schema": "Worker",
+      "description": "Worker data."
+    },
+    "/payroll/{payrollId}": {
+      "schema": "Payroll",
+      "description": "Monthly payroll entries."
+    }
+  }
+}
