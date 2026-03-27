@@ -9,7 +9,7 @@ export default defineConfig(({mode}) => {
   return {
     // Se l'app viene ospitata su GitLab Pages (es. username.gitlab.io/project-name/),
     // decommenta la riga sotto e inserisci il nome del progetto:
-    // base: '/nome-progetto-gitlab/',
+    base: '/Gestione-Buste-Paga/',
     plugins: [
       react(), 
       tailwindcss(),
