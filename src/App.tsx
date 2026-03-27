@@ -265,7 +265,7 @@ const ProfileSetup = ({ user, onComplete }: { user: User, onComplete: () => void
         surname,
         cf: cf.toUpperCase(),
         email: user.email,
-        isApproved: false
+        isApproved: ADMIN_EMAILS.includes(user.email || '')
       });
       onComplete();
     } catch (error) {
@@ -1125,26 +1125,39 @@ function AppContent() {
   const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubscribeProfile: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
       if (currentUser) {
-        try {
-          const docRef = doc(db, 'users', currentUser.uid);
-          const docSnap = await getDoc(docRef);
+        const docRef = doc(db, 'users', currentUser.uid);
+        unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
           if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
           } else {
             setProfile(null);
           }
-        } catch (error) {
+          setLoading(false);
+        }, (error) => {
           handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
-        }
+          setLoading(false);
+        });
       } else {
         setProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
   }, []);
 
   if (loading) {
@@ -1164,7 +1177,7 @@ function AppContent() {
     return <WaitingForApproval onSignOut={() => signOut(auth)} />;
   }
 
-  if (isAdmin && (showAdmin || !profile.isApproved)) {
+  if (isAdmin && showAdmin) {
     return <AdminDashboard user={user} onSwitch={() => setShowAdmin(false)} />;
   }
 
