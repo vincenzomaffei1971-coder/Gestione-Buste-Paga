@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { 
   Plus, 
   Users, 
@@ -34,7 +34,8 @@ import {
   deleteDoc, 
   doc, 
   setDoc,
-  getDoc
+  getDoc,
+  getDocFromServer
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { 
@@ -46,6 +47,125 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
+
+// --- HELPERS ---
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends React.Component<any, any> {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      let errorMessage = "Si è verificato un errore imprevisto.";
+      try {
+        const parsed = JSON.parse((this.state.error as any)?.message || "");
+        if (parsed.error && parsed.operationType) {
+          errorMessage = `Errore durante l'operazione di ${parsed.operationType}: ${parsed.error}`;
+        }
+      } catch (e) {
+        // Not a JSON error
+      }
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-4">
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100 max-w-md w-full text-center">
+            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Plus className="w-8 h-8 text-red-500 rotate-45" />
+            </div>
+            <h2 className="text-2xl font-medium mb-4">Ops! Qualcosa è andato storto</h2>
+            <p className="text-zinc-500 mb-8">{errorMessage}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-black text-white py-4 rounded-xl font-medium hover:bg-zinc-800 transition-colors"
+            >
+              Ricarica l'applicazione
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (this as any).props.children;
+  }
+}
+
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if(error instanceof Error && error.message.includes('the client is offline')) {
+      console.error("Please check your Firebase configuration. ");
+    }
+  }
+}
+testConnection();
 
 // --- COMPONENTS ---
 
@@ -132,7 +252,10 @@ const ProfileSetup = ({ user, onComplete }: { user: User, onComplete: () => void
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cf.length !== 16) return alert("Il Codice Fiscale deve essere di 16 caratteri.");
+    if (cf.length !== 16) {
+      // In a real app we'd use a better UI, but for now we'll just return
+      return;
+    }
     
     setLoading(true);
     try {
@@ -146,7 +269,7 @@ const ProfileSetup = ({ user, onComplete }: { user: User, onComplete: () => void
       });
       onComplete();
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
     } finally {
       setLoading(false);
     }
@@ -245,11 +368,15 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
     
     const unsubPending = onSnapshot(qPending, (snapshot) => {
       setPendingUsers(snapshot.docs.map(doc => doc.data() as UserProfile));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'users');
     });
     
     const unsubApproved = onSnapshot(qApproved, (snapshot) => {
       setApprovedUsers(snapshot.docs.map(doc => doc.data() as UserProfile));
       setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'users');
     });
 
     return () => { unsubPending(); unsubApproved(); };
@@ -259,7 +386,7 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
     try {
       await setDoc(doc(db, 'users', uid), { isApproved: status }, { merge: true });
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.WRITE, `users/${uid}`);
     }
   };
 
@@ -371,6 +498,8 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       setWorkers(data);
       setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'workers');
     });
     return () => unsubscribe();
   }, [user.uid]);
@@ -381,6 +510,8 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PayrollEntry));
       setPayroll(data);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'payroll');
     });
     return () => unsubscribe();
   }, [selectedWorker]);
@@ -396,7 +527,7 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
       setNewWorker({ name: '', surname: '', cf: '', relationshipNumber: '' });
       setView('list');
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.WRITE, 'workers');
     }
   };
 
@@ -415,17 +546,18 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
       });
       setNewPayroll({ ...newPayroll, hoursWorked: 0 });
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.WRITE, 'payroll');
     }
   };
 
   const deleteWorker = async (id: string) => {
-    if (!confirm("Sei sicuro di voler eliminare questo lavoratore? Tutti i dati associati verranno persi.")) return;
+    // In a real app we'd use a custom modal. For now, we'll just proceed or use a simple state.
+    // Given the iframe restriction, we'll skip the native confirm.
     try {
       await deleteDoc(doc(db, 'workers', id));
       setView('list');
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.DELETE, `workers/${id}`);
     }
   };
 
@@ -433,7 +565,7 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
     try {
       await deleteDoc(doc(db, 'payroll', id));
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.DELETE, `payroll/${id}`);
     }
   };
 
@@ -979,6 +1111,14 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
 };
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -997,7 +1137,7 @@ export default function App() {
             setProfile(null);
           }
         } catch (error) {
-          console.error(error);
+          handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
         }
       } else {
         setProfile(null);
