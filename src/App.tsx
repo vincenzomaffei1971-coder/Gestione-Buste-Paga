@@ -35,7 +35,9 @@ import {
   doc, 
   setDoc,
   getDoc,
-  getDocFromServer
+  getDocFromServer,
+  getDocs,
+  updateDoc
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { 
@@ -361,6 +363,9 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
   const [pendingUsers, setPendingUsers] = useState<UserProfile[]>([]);
   const [approvedUsers, setApprovedUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', surname: '', email: '', cf: '' });
+  const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
     const qPending = query(collection(db, 'users'), where('isApproved', '==', false));
@@ -390,6 +395,40 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
     }
   };
 
+  const deleteUser = async (uid: string) => {
+    if (!window.confirm("Sei sicuro di voler eliminare definitivamente questo utente? Tutti i suoi dati rimarranno nel database ma non potrà più accedere.")) return;
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
+    }
+  };
+
+  const handleManualAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError(null);
+    try {
+      // Check if user already exists by email
+      const q = query(collection(db, 'users'), where('email', '==', newUser.email));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        setAddError("Un utente con questa email esiste già.");
+        return;
+      }
+      
+      await addDoc(collection(db, 'users'), {
+        ...newUser,
+        cf: newUser.cf.toUpperCase(),
+        isApproved: true,
+        uid: '' // Empty UID means it's a pre-created profile
+      });
+      setNewUser({ name: '', surname: '', email: '', cf: '' });
+      setShowAddUser(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'users');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f5f5] p-8">
       <div className="max-w-4xl mx-auto">
@@ -399,6 +438,13 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
             <p className="text-zinc-500">Gestisci l'accesso degli utenti all'applicazione.</p>
           </div>
           <div className="flex gap-4">
+            <button 
+              onClick={() => setShowAddUser(true)}
+              className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Aggiungi Utente
+            </button>
             {ADMIN_EMAILS.includes(user.email || '') && (
               <button 
                 onClick={onSwitch}
@@ -418,6 +464,45 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
           </div>
         </header>
 
+        {showAddUser && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full"
+            >
+              <h2 className="text-2xl font-light mb-6">Aggiungi nuovo utente</h2>
+              <form onSubmit={handleManualAdd} className="space-y-4">
+                {addError && (
+                  <div className="bg-red-50 text-red-500 p-3 rounded-xl text-xs">
+                    {addError}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Nome</label>
+                  <input required value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Cognome</label>
+                  <input required value={newUser.surname} onChange={e => setNewUser({...newUser, surname: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Email</label>
+                  <input required type="email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Codice Fiscale</label>
+                  <input required maxLength={16} value={newUser.cf} onChange={e => setNewUser({...newUser, cf: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black uppercase" />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setShowAddUser(false)} className="flex-1 bg-zinc-100 text-zinc-600 rounded-xl py-3 font-medium">Annulla</button>
+                  <button type="submit" className="flex-1 bg-black text-white rounded-xl py-3 font-medium">Salva</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
@@ -433,18 +518,26 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
               ) : (
                 <div className="space-y-4">
                   {pendingUsers.map(u => (
-                    <div key={u.uid} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center">
+                    <div key={u.uid || u.email} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center">
                       <div>
                         <h3 className="font-medium">{u.name} {u.surname}</h3>
                         <p className="text-sm text-zinc-500">{u.email}</p>
                         <p className="text-xs text-zinc-400 font-mono mt-1">{u.cf}</p>
                       </div>
-                      <button 
-                        onClick={() => toggleApproval(u.uid, true)}
-                        className="bg-black text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors"
-                      >
-                        Approva
-                      </button>
+                      <div className="flex gap-3">
+                        <button 
+                          onClick={() => toggleApproval(u.uid, true)}
+                          className="bg-black text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors"
+                        >
+                          Approva
+                        </button>
+                        <button 
+                          onClick={() => deleteUser(u.uid)}
+                          className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -455,19 +548,29 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
               <h2 className="text-xs uppercase tracking-widest text-zinc-400 mb-6">Utenti approvati ({approvedUsers.length})</h2>
               <div className="space-y-4">
                 {approvedUsers.map(u => (
-                  <div key={u.uid} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center opacity-80">
+                  <div key={u.uid || u.email} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center">
                     <div>
                       <h3 className="font-medium">{u.name} {u.surname}</h3>
                       <p className="text-sm text-zinc-500">{u.email}</p>
                     </div>
-                    {u.email !== user.email && (
-                      <button 
-                        onClick={() => toggleApproval(u.uid, false)}
-                        className="text-red-500 text-sm font-medium hover:underline"
-                      >
-                        Revoca Accesso
-                      </button>
-                    )}
+                    <div className="flex items-center gap-4">
+                      {u.email !== user.email && (
+                        <>
+                          <button 
+                            onClick={() => toggleApproval(u.uid, false)}
+                            className="text-zinc-500 text-sm font-medium hover:underline"
+                          >
+                            Revoca Accesso
+                          </button>
+                          <button 
+                            onClick={() => deleteUser(u.uid)}
+                            className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1311,13 +1414,30 @@ function AppContent() {
 
       if (currentUser) {
         const docRef = doc(db, 'users', currentUser.uid);
-        unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
+        unsubscribeProfile = onSnapshot(docRef, async (docSnap) => {
           if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
+            setLoading(false);
           } else {
-            setProfile(null);
+            // Check if there's a pre-created profile by email
+            const q = query(collection(db, 'users'), where('email', '==', currentUser.email), where('uid', '==', ''));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+              const preCreatedDoc = snapshot.docs[0];
+              const preCreatedData = preCreatedDoc.data() as UserProfile;
+              // Link the profile to the new UID
+              await setDoc(doc(db, 'users', currentUser.uid), {
+                ...preCreatedData,
+                uid: currentUser.uid
+              });
+              // Delete the old pre-created doc
+              await deleteDoc(preCreatedDoc.ref);
+              // Profile will be updated by the next snapshot
+            } else {
+              setProfile(null);
+              setLoading(false);
+            }
           }
-          setLoading(false);
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
           setLoading(false);
