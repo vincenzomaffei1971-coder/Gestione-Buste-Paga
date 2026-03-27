@@ -255,16 +255,15 @@ const Login = () => {
   );
 };
 
-const ProfileSetup = ({ user, onComplete }: { user: User, onComplete: () => void }) => {
-  const [name, setName] = useState(user.displayName?.split(' ')[0] || '');
-  const [surname, setSurname] = useState(user.displayName?.split(' ').slice(1).join(' ') || '');
-  const [cf, setCf] = useState('');
+const ProfileSetup = ({ user, profile, onComplete }: { user: User, profile: UserProfile | null, onComplete: () => void }) => {
+  const [name, setName] = useState(profile?.name || user.displayName?.split(' ')[0] || '');
+  const [surname, setSurname] = useState(profile?.surname || user.displayName?.split(' ').slice(1).join(' ') || '');
+  const [cf, setCf] = useState(profile?.cf || '');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cf.length !== 16) {
-      // In a real app we'd use a better UI, but for now we'll just return
       return;
     }
     
@@ -276,7 +275,7 @@ const ProfileSetup = ({ user, onComplete }: { user: User, onComplete: () => void
         surname,
         cf: cf.toUpperCase(),
         email: user.email,
-        isApproved: isProtectedEmail(user.email)
+        isApproved: profile?.isApproved || isProtectedEmail(user.email)
       });
       onComplete();
     } catch (error) {
@@ -372,9 +371,11 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
   const [pendingUsers, setPendingUsers] = useState<UserProfile[]>([]);
   const [approvedUsers, setApprovedUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddUser, setShowAddUser] = useState(false);
+  const [activeTab, setActiveTab] = useState<'users' | 'add'>('users');
   const [newUser, setNewUser] = useState({ name: '', surname: '', email: '', cf: '' });
+  const [quickEmail, setQuickEmail] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
+  const [addSuccess, setAddSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     const qPending = query(collection(db, 'users'), where('isApproved', '==', false));
@@ -421,8 +422,8 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
   const handleManualAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddError(null);
+    setAddSuccess(null);
     try {
-      // Check if user already exists by email
       const q = query(collection(db, 'users'), where('email', '==', newUser.email));
       const snapshot = await getDocs(q);
       if (!snapshot.empty) {
@@ -434,10 +435,40 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
         ...newUser,
         cf: newUser.cf.toUpperCase(),
         isApproved: true,
-        uid: '' // Empty UID means it's a pre-created profile
+        uid: ''
       });
       setNewUser({ name: '', surname: '', email: '', cf: '' });
-      setShowAddUser(false);
+      setAddSuccess("Utente aggiunto con successo!");
+      setTimeout(() => setActiveTab('users'), 2000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'users');
+    }
+  };
+
+  const handleQuickAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError(null);
+    setAddSuccess(null);
+    if (!quickEmail) return;
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', quickEmail));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        setAddError("Un utente con questa email esiste già.");
+        return;
+      }
+      
+      await addDoc(collection(db, 'users'), {
+        name: '',
+        surname: '',
+        cf: '',
+        email: quickEmail,
+        isApproved: true,
+        uid: ''
+      });
+      setQuickEmail('');
+      setAddSuccess("Email pre-approvata con successo!");
+      setTimeout(() => setActiveTab('users'), 2000);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'users');
     }
@@ -452,13 +483,6 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
             <p className="text-zinc-500">Gestisci l'accesso degli utenti all'applicazione.</p>
           </div>
           <div className="flex gap-4">
-            <button 
-              onClick={() => setShowAddUser(true)}
-              className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Aggiungi Utente
-            </button>
             {isProtectedEmail(user.email) && (
               <button 
                 onClick={onSwitch}
@@ -478,27 +502,56 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
           </div>
         </header>
 
-        {showAddUser && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full"
-            >
-              <h2 className="text-2xl font-light mb-6">Aggiungi nuovo utente</h2>
-              <form onSubmit={handleManualAdd} className="space-y-4">
-                {addError && (
-                  <div className="bg-red-50 text-red-500 p-3 rounded-xl text-xs">
-                    {addError}
-                  </div>
-                )}
+        <div className="flex gap-8 mb-8 border-b border-zinc-200">
+          <button 
+            onClick={() => setActiveTab('users')}
+            className={`pb-4 text-sm font-medium transition-colors relative ${activeTab === 'users' ? 'text-black' : 'text-zinc-400 hover:text-zinc-600'}`}
+          >
+            Gestione Utenti
+            {activeTab === 'users' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />}
+          </button>
+          <button 
+            onClick={() => setActiveTab('add')}
+            className={`pb-4 text-sm font-medium transition-colors relative ${activeTab === 'add' ? 'text-black' : 'text-zinc-400 hover:text-zinc-600'}`}
+          >
+            Aggiungi Utente
+            {activeTab === 'add' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />}
+          </button>
+        </div>
+
+        {activeTab === 'add' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 md:grid-cols-2 gap-8"
+          >
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
+              <h2 className="text-xl font-medium mb-6">Pre-approva Email Google</h2>
+              <p className="text-sm text-zinc-500 mb-6">Inserisci solo l'email per permettere all'utente di accedere subito. Dovrà completare il profilo al primo accesso.</p>
+              <form onSubmit={handleQuickAdd} className="space-y-4">
+                {addError && <div className="bg-red-50 text-red-500 p-3 rounded-xl text-xs">{addError}</div>}
+                {addSuccess && <div className="bg-green-50 text-green-600 p-3 rounded-xl text-xs">{addSuccess}</div>}
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Nome</label>
-                  <input required value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Email Google</label>
+                  <input required type="email" value={quickEmail} onChange={e => setQuickEmail(e.target.value)} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" placeholder="esempio@gmail.com" />
                 </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Cognome</label>
-                  <input required value={newUser.surname} onChange={e => setNewUser({...newUser, surname: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                <button type="submit" className="w-full bg-black text-white rounded-xl py-3 font-medium hover:bg-zinc-800 transition-colors">Pre-approva Email</button>
+              </form>
+            </div>
+
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
+              <h2 className="text-xl font-medium mb-6">Profilo Completo</h2>
+              <p className="text-sm text-zinc-500 mb-6">Crea un profilo completo per l'utente.</p>
+              <form onSubmit={handleManualAdd} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Nome</label>
+                    <input required value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Cognome</label>
+                    <input required value={newUser.surname} onChange={e => setNewUser({...newUser, surname: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Email</label>
@@ -508,16 +561,14 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
                   <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Codice Fiscale</label>
                   <input required maxLength={16} value={newUser.cf} onChange={e => setNewUser({...newUser, cf: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black uppercase" />
                 </div>
-                <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setShowAddUser(false)} className="flex-1 bg-zinc-100 text-zinc-600 rounded-xl py-3 font-medium">Annulla</button>
-                  <button type="submit" className="flex-1 bg-black text-white rounded-xl py-3 font-medium">Salva</button>
-                </div>
+                <button type="submit" className="w-full bg-zinc-100 text-zinc-600 rounded-xl py-3 font-medium hover:bg-zinc-200 transition-colors">Salva Profilo</button>
               </form>
-            </motion.div>
-          </div>
+            </div>
+          </motion.div>
         )}
 
-        {loading ? (
+        {activeTab === 'users' && (
+          loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
           </div>
@@ -595,7 +646,7 @@ const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }
               </div>
             </section>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
@@ -1482,7 +1533,7 @@ function AppContent() {
   }
 
   if (!user) return <Login />;
-  if (!profile) return <ProfileSetup user={user} onComplete={() => window.location.reload()} />;
+  if (!profile || !profile.name || !profile.surname || !profile.cf) return <ProfileSetup user={user} profile={profile} onComplete={() => window.location.reload()} />;
 
   const isAdmin = isProtectedEmail(user.email);
 
