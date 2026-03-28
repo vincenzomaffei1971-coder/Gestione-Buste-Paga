@@ -275,125 +275,6 @@ const Login = () => {
   );
 };
 
-const ProfileSetup = ({ user, profile, onComplete }: { user: User, profile: UserProfile | null, onComplete: () => void }) => {
-  const [name, setName] = useState(profile?.name || user.displayName?.split(' ')[0] || '');
-  const [surname, setSurname] = useState(profile?.surname || user.displayName?.split(' ').slice(1).join(' ') || '');
-  const [cf, setCf] = useState(profile?.cf || '');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchPreApprovedData = async () => {
-      if (user.email && !profile) {
-        try {
-          const docSnap = await getDoc(doc(db, 'preapproved_emails', user.email));
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.name) setName(data.name);
-            if (data.surname) setSurname(data.surname);
-            if (data.cf) setCf(data.cf);
-          }
-        } catch (error) {
-          console.error("Error fetching pre-approved data:", error);
-        }
-      }
-    };
-    fetchPreApprovedData();
-  }, [user.email, profile]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (cf.length !== 16) {
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      let isPreApproved = false;
-      if (user.email) {
-        try {
-          const preapprovedDoc = await getDoc(doc(db, 'preapproved_emails', user.email));
-          isPreApproved = preapprovedDoc.exists();
-        } catch (error) {
-          console.error("Error checking pre-approval:", error);
-        }
-      }
-
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
-        name,
-        surname,
-        cf: cf.toUpperCase(),
-        email: user.email,
-        isApproved: profile?.isApproved || isProtectedEmail(user.email) || isPreApproved,
-        role: profile?.role || (isProtectedEmail(user.email) ? 'admin' : 'user')
-      }, { merge: true });
-      
-      if (isPreApproved && user.email) {
-        try {
-          await deleteDoc(doc(db, 'preapproved_emails', user.email));
-        } catch (error) {
-          console.error("Error deleting pre-approval:", error);
-        }
-      }
-      
-      onComplete();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] p-4">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white p-8 rounded-3xl shadow-sm max-w-md w-full"
-      >
-        <h2 className="text-2xl font-light mb-6">Configura il tuo profilo</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Nome</label>
-            <input 
-              required
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="w-full bg-zinc-50 border-none rounded-xl p-3 focus:ring-2 focus:ring-black outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Cognome</label>
-            <input 
-              required
-              value={surname}
-              onChange={e => setSurname(e.target.value)}
-              className="w-full bg-zinc-50 border-none rounded-xl p-3 focus:ring-2 focus:ring-black outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Codice Fiscale</label>
-            <input 
-              required
-              maxLength={16}
-              value={cf}
-              onChange={e => setCf(e.target.value)}
-              className="w-full bg-zinc-50 border-none rounded-xl p-3 focus:ring-2 focus:ring-black outline-none uppercase"
-              placeholder="RSSMRA80A01H501Z"
-            />
-          </div>
-          <button 
-            disabled={loading}
-            className="w-full bg-black text-white rounded-xl py-4 font-medium mt-4 disabled:opacity-50"
-          >
-            {loading ? "Salvataggio..." : "Completa Configurazione"}
-          </button>
-        </form>
-      </motion.div>
-    </div>
-  );
-};
-
 const WaitingForApproval = ({ onSignOut }: { onSignOut: () => void }) => (
   <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] p-4">
     <motion.div 
@@ -460,7 +341,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [payroll, setPayroll] = useState<PayrollEntry[]>([]);
-  const [view, setView] = useState<'list' | 'worker' | 'add-worker' | 'print-cu' | 'print-payslip' | 'admin-users' | 'admin-add'>('list');
+  const [view, setView] = useState<'list' | 'worker' | 'add-worker' | 'print-cu' | 'print-payslip' | 'admin-users' | 'admin-add' | 'admin-preapproved'>('list');
   const [loading, setLoading] = useState(true);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollEntry | null>(null);
   const [selectedYear, setSelectedYear] = useState(2026);
@@ -469,6 +350,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   // Admin states
   const [pendingUsers, setPendingUsers] = useState<UserProfile[]>([]);
   const [approvedUsers, setApprovedUsers] = useState<UserProfile[]>([]);
+  const [preapprovedList, setPreapprovedList] = useState<any[]>([]);
   const [adminLoading, setAdminLoading] = useState(true);
   const [adminUserForm, setAdminUserForm] = useState({ name: '', surname: '', email: '', cf: '' });
   const [quickEmail, setQuickEmail] = useState('');
@@ -548,7 +430,14 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
       handleFirestoreError(error, OperationType.GET, 'users');
     });
 
-    return () => { unsubPending(); unsubApproved(); };
+    const qPre = query(collection(db, 'preapproved_emails'));
+    const unsubPre = onSnapshot(qPre, (snapshot) => {
+      setPreapprovedList(snapshot.docs.map(doc => doc.data()));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'preapproved_emails');
+    });
+
+    return () => { unsubPending(); unsubApproved(); unsubPre(); };
   }, [user.email, profile.role]);
 
   const handleAddWorker = async (e: React.FormEvent) => {
@@ -675,6 +564,14 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
     }
   };
 
+  const deletePreApproved = async (email: string) => {
+    try {
+      await deleteDoc(doc(db, 'preapproved_emails', email));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `preapproved_emails/${email}`);
+    }
+  };
+
   const handleManualAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdminError(null);
@@ -774,6 +671,13 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                 >
                   <UserPlus className="w-4 h-4" />
                   Aggiungi Utente
+                </button>
+                <button 
+                  onClick={() => setView('admin-preapproved')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'admin-preapproved' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
+                >
+                  <History className="w-4 h-4" />
+                  Pre-autorizzati
                 </button>
               </>
             )}
@@ -1388,6 +1292,47 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
             </motion.div>
           )}
 
+          {isAdmin && view === 'admin-preapproved' && (
+            <motion.div 
+              key="admin-preapproved"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="max-w-4xl"
+            >
+              <h1 className="text-4xl font-light tracking-tight mb-8">Email Pre-autorizzate</h1>
+              <div className="space-y-6">
+                <div className="bg-white p-8 rounded-3xl border border-zinc-100">
+                  <h2 className="text-xs uppercase tracking-widest text-zinc-400 mb-6">Lista Pre-autorizzazioni ({preapprovedList.length})</h2>
+                  {preapprovedList.length === 0 ? (
+                    <div className="text-center py-12 italic text-zinc-400 text-sm">
+                      Nessuna email pre-autorizzata in lista.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-zinc-50">
+                      {preapprovedList.map((item, idx) => (
+                        <div key={idx} className="py-4 flex items-center justify-between group">
+                          <div>
+                            <p className="font-medium">{item.email}</p>
+                            <p className="text-[10px] text-zinc-400 uppercase tracking-wider">
+                              {item.name ? `${item.name} ${item.surname}` : 'Solo Email'} • Aggiunto il {new Date(item.addedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <button 
+                            onClick={() => deletePreApproved(item.email)}
+                            className="p-2 text-zinc-300 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {isAdmin && view === 'admin-users' && (
             <motion.div 
               key="admin-users"
@@ -1623,23 +1568,45 @@ function AppContent() {
   const [isPreApproved, setIsPreApproved] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (user && !profile && user.email) {
-      if (isProtectedEmail(user.email)) {
-        setIsPreApproved(true);
-        return;
-      }
-      const checkPreApproval = async () => {
+    const autoCreateProfile = async () => {
+      if (user && !profile && !loading && user.email) {
+        let preApprovedData: any = null;
         try {
-          const docSnap = await getDoc(doc(db, 'preapproved_emails', user.email!));
-          setIsPreApproved(docSnap.exists());
-        } catch (error) {
-          console.error("Error checking pre-approval:", error);
+          const preDoc = await getDoc(doc(db, 'preapproved_emails', user.email));
+          if (preDoc.exists()) {
+            preApprovedData = preDoc.data();
+          }
+        } catch (e) { console.error(e); }
+
+        const isProtected = isProtectedEmail(user.email);
+
+        if (preApprovedData || isProtected) {
+          const newProfile = {
+            uid: user.uid,
+            email: user.email,
+            name: preApprovedData?.name || user.displayName?.split(' ')[0] || 'Utente',
+            surname: preApprovedData?.surname || user.displayName?.split(' ').slice(1).join(' ') || '',
+            cf: preApprovedData?.cf || '',
+            isApproved: true,
+            role: preApprovedData?.role || (isProtected ? 'admin' : 'user')
+          };
+          
+          try {
+            await setDoc(doc(db, 'users', user.uid), newProfile);
+            if (preApprovedData) {
+              await deleteDoc(doc(db, 'preapproved_emails', user.email));
+            }
+          } catch (e) {
+            console.error("Error auto-creating profile:", e);
+          }
+        } else {
           setIsPreApproved(false);
         }
-      };
-      checkPreApproval();
-    }
-  }, [user, profile]);
+      }
+    };
+
+    autoCreateProfile();
+  }, [user, profile, loading]);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -1688,11 +1655,17 @@ function AppContent() {
 
   if (!user) return <Login />;
   
-  if (!profile && isPreApproved === false && !isProtectedEmail(user.email)) {
+  if (!profile && isPreApproved === false) {
     return <NotAuthorized onSignOut={() => signOut(auth)} />;
   }
 
-  if (!profile || !profile.name || !profile.surname || !profile.cf) return <ProfileSetup user={user} profile={profile} onComplete={() => window.location.reload()} />;
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+      </div>
+    );
+  }
 
   const isAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
 
