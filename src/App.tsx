@@ -17,7 +17,8 @@ import {
   Briefcase,
   History,
   Search,
-  UserPlus
+  UserPlus,
+  TrendingUp
 } from 'lucide-react';
 import { 
   GoogleAuthProvider,
@@ -44,6 +45,7 @@ import { auth, db } from './firebase';
 import { 
   Worker, 
   PayrollEntry, 
+  TfrYearlyData,
   MONTHS, 
   YEARS, 
   calculatePayroll,
@@ -341,6 +343,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [payroll, setPayroll] = useState<PayrollEntry[]>([]);
+  const [tfrYearlyData, setTfrYearlyData] = useState<TfrYearlyData[]>([]);
   const [view, setView] = useState<'list' | 'worker' | 'add-worker' | 'print-cu' | 'print-payslip' | 'admin-users' | 'admin-add' | 'admin-preapproved'>('list');
   const [loading, setLoading] = useState(true);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollEntry | null>(null);
@@ -406,6 +409,17 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
       setPayroll(data);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'payroll');
+    });
+    return () => unsubscribe();
+  }, [selectedWorker]);
+
+  useEffect(() => {
+    if (!selectedWorker) return;
+    const q = query(collection(db, 'tfr_yearly'), where('workerId', '==', selectedWorker.id));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setTfrYearlyData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TfrYearlyData)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'tfr_yearly');
     });
     return () => unsubscribe();
   }, [selectedWorker]);
@@ -512,6 +526,21 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
       await deleteDoc(doc(db, 'payroll', id));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `payroll/${id}`);
+    }
+  };
+
+  const updateTfrYearly = async (year: number, rate: number, isPaid: boolean) => {
+    if (!selectedWorker) return;
+    const id = `${selectedWorker.id}_${year}`;
+    try {
+      await setDoc(doc(db, 'tfr_yearly', id), {
+        workerId: selectedWorker.id,
+        year,
+        revaluationRate: rate,
+        isPaid
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `tfr_yearly/${id}`);
     }
   };
 
@@ -1006,6 +1035,116 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
 
                 {/* History and Documents */}
                 <div className="lg:col-span-2 space-y-8">
+                  {/* Document Generation */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* CU Card */}
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
+                      <div className="w-10 h-10 bg-zinc-50 rounded-xl flex items-center justify-center mb-4">
+                        <FileText className="w-5 h-5 text-zinc-500" />
+                      </div>
+                      <h3 className="text-lg font-medium mb-2">Certificazione Unica</h3>
+                      <p className="text-sm text-zinc-400 mb-6">Genera la dichiarazione sostitutiva annuale.</p>
+                      <div className="flex gap-2">
+                        <select 
+                          value={selectedYear}
+                          onChange={e => setSelectedYear(parseInt(e.target.value))}
+                          className="bg-zinc-50 border-none rounded-xl px-3 text-xs outline-none"
+                        >
+                          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                        <button 
+                          onClick={() => setView('print-cu')}
+                          className="flex-1 bg-black text-white rounded-xl py-3 text-xs font-medium flex items-center justify-center gap-2 hover:bg-zinc-800 transition-colors"
+                        >
+                          <Printer className="w-3 h-3" />
+                          Visualizza CU
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* TFR Summary Card */}
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-medium flex items-center gap-2">
+                          <History className="w-4 h-4 text-zinc-400" />
+                          Prospetto TFR Totale
+                        </h3>
+                        <span className="text-xs font-mono font-bold bg-zinc-100 px-2 py-1 rounded-lg">
+                          {payroll.reduce((acc, p) => acc + p.tfr, 0).toFixed(2)}€
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 leading-relaxed">
+                        Accantonamento totale maturato calcolato sulla base dei periodi inseriti.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* TFR Yearly Revaluation Section */}
+                  <div className="bg-white rounded-3xl shadow-sm border border-zinc-100 overflow-hidden">
+                    <div className="p-6 border-b border-zinc-50">
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5" />
+                        Rivalutazione TFR Annuale
+                      </h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="bg-zinc-50 text-[10px] uppercase tracking-widest text-zinc-400">
+                            <th className="px-6 py-4 font-medium">Anno</th>
+                            <th className="px-6 py-4 font-medium">TFR Maturato</th>
+                            <th className="px-6 py-4 font-medium">Tasso Riv. (%)</th>
+                            <th className="px-6 py-4 font-medium">TFR Rivalutato</th>
+                            <th className="px-6 py-4 font-medium">Saldato</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-50">
+                          {Array.from(new Set(payroll.map(p => p.year))).sort((a: number, b: number) => b - a).map((year: number) => {
+                            const yearlyTfr = payroll.filter(p => p.year === year).reduce((acc, p) => acc + p.tfr, 0);
+                            const tfrData = (tfrYearlyData.find(d => d.year === year) || { id: '', workerId: '', year, revaluationRate: 1.5, isPaid: false }) as TfrYearlyData;
+                            const revaluedTfr = yearlyTfr * (1 + (Number(tfrData.revaluationRate) || 0) / 100);
+                            
+                            return (
+                              <tr key={year} className="hover:bg-zinc-50 transition-colors">
+                                <td className="px-6 py-4 font-medium">{year}</td>
+                                <td className="px-6 py-4 font-mono">{yearlyTfr.toFixed(2)}€</td>
+                                <td className="px-6 py-4">
+                                  <input 
+                                    type="number"
+                                    step="0.1"
+                                    value={tfrData.revaluationRate}
+                                    onChange={(e) => updateTfrYearly(year, parseFloat(e.target.value), tfrData.isPaid)}
+                                    className="w-16 bg-zinc-50 border-none rounded-lg p-1 text-xs focus:ring-1 focus:ring-black outline-none font-mono"
+                                  />
+                                </td>
+                                <td className="px-6 py-4 font-mono font-bold text-black">{revaluedTfr.toFixed(2)}€</td>
+                                <td className="px-6 py-4">
+                                  <button 
+                                    onClick={() => updateTfrYearly(year, Number(tfrData.revaluationRate) || 0, !tfrData.isPaid)}
+                                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                                      tfrData.isPaid 
+                                        ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                                        : 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200'
+                                    }`}
+                                  >
+                                    {tfrData.isPaid ? 'Saldato' : 'Da Saldare'}
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {payroll.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">
+                                Nessun dato annuale disponibile.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
                   {/* History Table */}
                   <div className="bg-white rounded-3xl shadow-sm border border-zinc-100 overflow-hidden">
                     <div className="p-6 border-b border-zinc-50 flex justify-between items-center">
@@ -1062,91 +1201,6 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                           )}
                         </tbody>
                       </table>
-                    </div>
-                  </div>
-
-                  {/* Document Generation */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* CU Card */}
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
-                      <div className="w-10 h-10 bg-zinc-50 rounded-xl flex items-center justify-center mb-4">
-                        <FileText className="w-5 h-5 text-zinc-500" />
-                      </div>
-                      <h3 className="text-lg font-medium mb-2">Certificazione Unica</h3>
-                      <p className="text-sm text-zinc-400 mb-6">Genera la dichiarazione sostitutiva annuale.</p>
-                      <div className="flex gap-2">
-                        <select 
-                          value={selectedYear}
-                          onChange={e => setSelectedYear(parseInt(e.target.value))}
-                          className="bg-zinc-50 border-none rounded-xl px-3 text-xs outline-none"
-                        >
-                          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
-                        <button 
-                          onClick={() => setView('print-cu')}
-                          className="flex-1 bg-black text-white rounded-xl py-3 text-xs font-medium flex items-center justify-center gap-2 hover:bg-zinc-800 transition-colors"
-                        >
-                          <Printer className="w-3 h-3" />
-                          Visualizza CU
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* TFR Card */}
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-medium flex items-center gap-2">
-                          <History className="w-4 h-4 text-zinc-400" />
-                          Prospetto TFR
-                        </h3>
-                        <span className="text-xs font-mono font-bold bg-zinc-100 px-2 py-1 rounded-lg">
-                          {payroll.reduce((acc, p) => acc + p.tfr, 0).toFixed(2)}€
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-zinc-400 leading-relaxed">
-                        Accantonamento totale maturato calcolato sulla base dei periodi inseriti.
-                      </p>
-                    </div>
-
-                    {/* Payroll History */}
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 mt-8">
-                      <h3 className="text-sm font-medium mb-6 flex items-center gap-2">
-                        <History className="w-4 h-4" />
-                        Storico Buste Paga
-                      </h3>
-                      <div className="space-y-2">
-                        {payroll.length === 0 ? (
-                          <p className="text-xs text-zinc-400 italic text-center py-4">Nessun dato storico trovato.</p>
-                        ) : (
-                          payroll
-                            .sort((a, b) => {
-                              if (a.year !== b.year) return b.year - a.year;
-                              return MONTHS.indexOf(b.month) - MONTHS.indexOf(a.month);
-                            })
-                            .map(p => (
-                              <div key={p.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-xl group hover:bg-zinc-100 transition-colors">
-                                <div>
-                                  <p className="text-xs font-medium">{p.month} {p.year}</p>
-                                  <p className="text-[10px] text-zinc-400">{p.hoursWorked}h @ {p.hourlyRate}€/h</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button 
-                                    onClick={() => { setSelectedPayroll(p); setView('print-payslip'); }}
-                                    className="p-2 text-zinc-400 hover:text-black transition-colors"
-                                  >
-                                    <Printer className="w-3 h-3" />
-                                  </button>
-                                  <button 
-                                    onClick={() => deletePayroll(p.id)}
-                                    className="p-2 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))
-                        )}
-                      </div>
                     </div>
                   </div>
                 </div>

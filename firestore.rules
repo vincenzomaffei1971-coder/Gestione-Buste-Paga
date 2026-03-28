@@ -136,6 +136,11 @@ service cloud.firestore {
       allow delete: if isApproved() && (resource.data.managerId == request.auth.uid || isAdmin());
     }
 
+    match /tfr_yearly/{tfrId} {
+      allow read: if isApproved();
+      allow write: if isApproved();
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

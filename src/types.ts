@@ -34,6 +34,14 @@ export interface PayrollEntry {
   tfr: number;
 }
 
+export interface TfrYearlyData {
+  id: string;
+  workerId: string;
+  year: number;
+  revaluationRate: number; // e.g. 1.5
+  isPaid: boolean;
+}
+
 export const MONTHS = [
   "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
   "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"
