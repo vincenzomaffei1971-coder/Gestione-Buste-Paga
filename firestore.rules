@@ -52,12 +52,21 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          ((request.auth.token.email == "vincenzomaffei1971@gmail.com" || request.auth.token.email == "vincenzo.maffei@gmail.com") && request.auth.token.email_verified == true));
+          ((request.auth.token.email == "vincenzomaffei1971@gmail.com" || request.auth.token.email == "vincenzo.maffei@gmail.com" || request.auth.token.email == "vincenzo.maffei-1971@gmail.com") && request.auth.token.email_verified == true));
+    }
+
+    function isUser() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'user');
     }
 
     function isApproved() {
       return isAuthenticated() && 
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true || isAdmin());
+    }
+
+    function isProtectedUser(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.email == "vincenzomaffei1971@gmail.com";
     }
 
     function isValidUser(data) {
@@ -72,7 +81,7 @@ service cloud.firestore {
 
     function isValidWorker(data) {
       return isApproved() &&
-             data.keys().hasAll(['managerId', 'name', 'surname', 'cf', 'relationshipNumber']) &&
+             data.keys().hasAll(['managerId', 'name', 'surname', 'cf', 'relationshipNumber', 'employerName', 'employerSurname', 'employerCf', 'title']) &&
              data.managerId == request.auth.uid &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.surname is string && data.surname.size() > 0 && data.surname.size() < 100 &&
@@ -107,14 +116,15 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin() || (isAuthenticated() && resource.data.email == request.auth.token.email);
       allow create: if isOwner(uid) && isValidUser(request.resource.data) && 
-        (request.resource.data.isApproved == false || exists(/databases/$(database)/documents/preapproved_emails/$(request.auth.token.email))) &&
+        (exists(/databases/$(database)/documents/preapproved_emails/$(request.auth.token.email)) || isAdmin()) &&
         (request.resource.data.role == 'user' || isAdmin());
-      allow update: if (isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.isApproved == resource.data.isApproved && request.resource.data.role == resource.data.role) || isAdmin();
+      allow update: if !isProtectedUser(uid) && ((isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.isApproved == resource.data.isApproved && request.resource.data.role == resource.data.role) || isAdmin());
+      allow delete: if isAdmin() && !isProtectedUser(uid);
     }
 
     match /workers/{workerId} {
       allow read: if isApproved() && (resource.data.managerId == request.auth.uid || isAdmin());
-      allow create: if isApproved() && isValidWorker(request.resource.data);
+      allow create: if isApproved() && isUser() && isValidWorker(request.resource.data);
       allow update: if isApproved() && (resource.data.managerId == request.auth.uid && isValidWorker(request.resource.data)) || isAdmin();
       allow delete: if isApproved() && (resource.data.managerId == request.auth.uid || isAdmin());
     }

@@ -197,12 +197,13 @@ const Login = () => {
 
     signInWithPopup(auth, provider)
       .catch((err: any) => {
+        if (err.code === 'auth/popup-closed-by-user') {
+          setLoading(false);
+          return;
+        }
         console.error("Login error:", err);
         if (err.code === 'auth/popup-blocked') {
           setError('Il popup di accesso è stato bloccato dal browser. Clicca sul link qui sotto per aprire l\'app in una nuova scheda e riprovare.');
-          setLoading(false);
-        } else if (err.code === 'auth/popup-closed-by-user') {
-          setError('Accesso annullato. Riprova se desideri entrare.');
           setLoading(false);
         } else {
           setError('Errore durante l\'accesso con Google. Riprova.');
@@ -427,6 +428,30 @@ const WaitingForApproval = ({ onSignOut }: { onSignOut: () => void }) => (
 
 
 
+const NotAuthorized = ({ onSignOut }: { onSignOut: () => void }) => (
+  <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] p-4">
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="bg-white p-8 rounded-3xl shadow-sm max-w-md w-full text-center"
+    >
+      <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <LogOut className="text-red-400 w-8 h-8" />
+      </div>
+      <h2 className="text-2xl font-light mb-4">Accesso non autorizzato</h2>
+      <p className="text-zinc-500 mb-8">
+        Spiacenti, il tuo account non è stato ancora censito nel sistema. Contatta un amministratore per richiedere l'accesso.
+      </p>
+      <button 
+        onClick={onSignOut}
+        className="w-full bg-zinc-100 text-zinc-600 rounded-xl py-4 font-medium hover:bg-zinc-200 transition-colors"
+      >
+        Esci
+      </button>
+    </motion.div>
+  </div>
+);
+
 const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   const [isTestMode, setIsTestMode] = useState(false);
   const actualIsAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
@@ -474,7 +499,10 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   }, [profile]);
 
   useEffect(() => {
-    const q = query(collection(db, 'workers'), where('managerId', '==', user.uid));
+    const q = actualIsAdmin 
+      ? collection(db, 'workers')
+      : query(collection(db, 'workers'), where('managerId', '==', user.uid));
+      
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       setWorkers(data);
@@ -487,7 +515,10 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
 
   useEffect(() => {
     if (!selectedWorker) return;
-    const q = query(collection(db, 'payroll'), where('workerId', '==', selectedWorker.id));
+    const q = actualIsAdmin
+      ? query(collection(db, 'payroll'), where('workerId', '==', selectedWorker.id))
+      : query(collection(db, 'payroll'), where('workerId', '==', selectedWorker.id), where('managerId', '==', user.uid));
+      
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PayrollEntry));
       setPayroll(data);
@@ -719,13 +750,15 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               <Users className="w-4 h-4" />
               Lavoratori
             </button>
-            <button 
-              onClick={() => { setView('add-worker')} }
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'add-worker' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
-            >
-              <Plus className="w-4 h-4" />
-              Nuovo Lavoratore
-            </button>
+            {profile.role === 'user' && (
+              <button 
+                onClick={() => { setView('add-worker')} }
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'add-worker' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
+              >
+                <Plus className="w-4 h-4" />
+                Nuovo Lavoratore
+              </button>
+            )}
             {isAdmin && (
               <>
                 <button 
@@ -1587,6 +1620,26 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPreApproved, setIsPreApproved] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (user && !profile && user.email) {
+      if (isProtectedEmail(user.email)) {
+        setIsPreApproved(true);
+        return;
+      }
+      const checkPreApproval = async () => {
+        try {
+          const docSnap = await getDoc(doc(db, 'preapproved_emails', user.email!));
+          setIsPreApproved(docSnap.exists());
+        } catch (error) {
+          console.error("Error checking pre-approval:", error);
+          setIsPreApproved(false);
+        }
+      };
+      checkPreApproval();
+    }
+  }, [user, profile]);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -1634,6 +1687,11 @@ function AppContent() {
   }
 
   if (!user) return <Login />;
+  
+  if (!profile && isPreApproved === false && !isProtectedEmail(user.email)) {
+    return <NotAuthorized onSignOut={() => signOut(auth)} />;
+  }
+
   if (!profile || !profile.name || !profile.surname || !profile.cf) return <ProfileSetup user={user} profile={profile} onComplete={() => window.location.reload()} />;
 
   const isAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
