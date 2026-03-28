@@ -428,6 +428,10 @@ const WaitingForApproval = ({ onSignOut }: { onSignOut: () => void }) => (
 
 
 const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
+  const [isTestMode, setIsTestMode] = useState(false);
+  const actualIsAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
+  const isAdmin = actualIsAdmin && !isTestMode;
+
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [payroll, setPayroll] = useState<PayrollEntry[]>([]);
@@ -495,8 +499,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
 
   // Admin Effects
   useEffect(() => {
-    const isAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
-    if (!isAdmin) return;
+    if (!actualIsAdmin) return;
 
     const qPending = query(collection(db, 'users'), where('isApproved', '==', false));
     const qApproved = query(collection(db, 'users'), where('isApproved', '==', true));
@@ -723,7 +726,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               <Plus className="w-4 h-4" />
               Nuovo Lavoratore
             </button>
-            {(isProtectedEmail(profile.email) || profile.role === 'admin') && (
+            {isAdmin && (
               <>
                 <button 
                   onClick={() => setView('admin-users')}
@@ -745,6 +748,20 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
         </div>
 
         <div className="mt-auto p-6 border-t border-zinc-100">
+          {actualIsAdmin && (
+            <button
+              onClick={() => {
+                setIsTestMode(!isTestMode);
+                if (!isTestMode && (view === 'admin-users' || view === 'admin-add')) {
+                  setView('list');
+                }
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-2 mb-4 rounded-xl text-xs transition-colors ${isTestMode ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'text-zinc-500 hover:bg-zinc-50'}`}
+            >
+              <div className={`w-2 h-2 rounded-full ${isTestMode ? 'bg-amber-500' : 'bg-zinc-300'}`} />
+              {isTestMode ? 'Esci da Modalità Test' : 'Modalità Test (Vista Utente)'}
+            </button>
+          )}
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center">
               <UserIcon className="w-4 h-4 text-zinc-500" />
@@ -1285,7 +1302,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
             </motion.div>
           )}
 
-          {view === 'admin-add' && (
+          {isAdmin && view === 'admin-add' && (
             <motion.div 
               key="admin-add"
               initial={{ opacity: 0, y: 10 }}
@@ -1338,7 +1355,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
             </motion.div>
           )}
 
-          {view === 'admin-users' && (
+          {isAdmin && view === 'admin-users' && (
             <motion.div 
               key="admin-users"
               initial={{ opacity: 0, y: 10 }}
