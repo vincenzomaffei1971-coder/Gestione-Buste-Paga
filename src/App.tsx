@@ -16,11 +16,14 @@ import {
   User as UserIcon,
   Briefcase,
   History,
-  Search
+  Search,
+  UserPlus
 } from 'lucide-react';
 import { 
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut, 
   onAuthStateChanged,
   User
@@ -186,18 +189,29 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = () => {
     setError('');
     setLoading(true);
     const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (err: any) {
-      console.error(err);
-      setError('Errore durante l\'accesso con Google. Riprova.');
-    } finally {
-      setLoading(false);
-    }
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+
+    // Calling signInWithPopup directly in the click handler to maximize chances of success
+    signInWithPopup(auth, provider)
+      .catch((err: any) => {
+        console.error("Login error:", err);
+        if (err.code === 'auth/popup-blocked') {
+          setError('Il popup di accesso è stato bloccato dal browser. Per favore, abilita i popup per questo sito o apri l\'applicazione in una nuova scheda cliccando sull\'icona "Open in new tab" in alto a destra nel pannello di anteprima.');
+          setLoading(false);
+        } else if (err.code === 'auth/popup-closed-by-user') {
+          setError('Accesso annullato. Riprova se desideri entrare.');
+          setLoading(false);
+        } else {
+          setError('Errore durante l\'accesso con Google. Riprova.');
+          setLoading(false);
+        }
+      });
   };
 
   return (
@@ -217,13 +231,21 @@ const Login = () => {
 
         <div className="space-y-4">
           {error && (
-            <motion.p 
+            <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-red-500 text-xs text-center"
+              className="bg-red-50 text-red-600 p-4 rounded-xl text-xs text-center border border-red-100 flex flex-col gap-2"
             >
-              {error}
-            </motion.p>
+              <p>{error}</p>
+              {error.includes('popup') && (
+                <button 
+                  onClick={() => window.open(window.location.href, '_blank')}
+                  className="text-red-700 font-bold underline"
+                >
+                  Apri in una nuova scheda
+                </button>
+              )}
+            </motion.div>
           )}
 
           <button 
@@ -367,300 +389,26 @@ const WaitingForApproval = ({ onSignOut }: { onSignOut: () => void }) => (
   </div>
 );
 
-const AdminDashboard = ({ user, onSwitch }: { user: User, onSwitch: () => void }) => {
-  const [pendingUsers, setPendingUsers] = useState<UserProfile[]>([]);
-  const [approvedUsers, setApprovedUsers] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'add'>('users');
-  const [newUser, setNewUser] = useState({ name: '', surname: '', email: '', cf: '' });
-  const [quickEmail, setQuickEmail] = useState('');
-  const [addError, setAddError] = useState<string | null>(null);
-  const [addSuccess, setAddSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    const qPending = query(collection(db, 'users'), where('isApproved', '==', false));
-    const qApproved = query(collection(db, 'users'), where('isApproved', '==', true));
-    
-    const unsubPending = onSnapshot(qPending, (snapshot) => {
-      setPendingUsers(snapshot.docs.map(doc => doc.data() as UserProfile));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'users');
-    });
-    
-    const unsubApproved = onSnapshot(qApproved, (snapshot) => {
-      setApprovedUsers(snapshot.docs.map(doc => doc.data() as UserProfile));
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'users');
-    });
 
-    return () => { unsubPending(); unsubApproved(); };
-  }, []);
-
-  const toggleApproval = async (uid: string, email: string, status: boolean) => {
-    if (isProtectedEmail(email)) return;
-    try {
-      await setDoc(doc(db, 'users', uid), { isApproved: status }, { merge: true });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${uid}`);
-    }
-  };
-
-  const deleteUser = async (uid: string, email: string) => {
-    if (isProtectedEmail(email)) {
-      alert("Questo utente è un amministratore di sistema e non può essere rimosso.");
-      return;
-    }
-    if (!window.confirm("Sei sicuro di voler eliminare definitivamente questo utente? Tutti i suoi dati rimarranno nel database ma non potrà più accedere.")) return;
-    try {
-      await deleteDoc(doc(db, 'users', uid));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
-    }
-  };
-
-  const handleManualAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAddError(null);
-    setAddSuccess(null);
-    try {
-      const q = query(collection(db, 'users'), where('email', '==', newUser.email));
-      const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        setAddError("Un utente con questa email esiste già.");
-        return;
-      }
-      
-      await addDoc(collection(db, 'users'), {
-        ...newUser,
-        cf: newUser.cf.toUpperCase(),
-        isApproved: true,
-        uid: ''
-      });
-      setNewUser({ name: '', surname: '', email: '', cf: '' });
-      setAddSuccess("Utente aggiunto con successo!");
-      setTimeout(() => setActiveTab('users'), 2000);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'users');
-    }
-  };
-
-  const handleQuickAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAddError(null);
-    setAddSuccess(null);
-    if (!quickEmail) return;
-    try {
-      const q = query(collection(db, 'users'), where('email', '==', quickEmail));
-      const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        setAddError("Un utente con questa email esiste già.");
-        return;
-      }
-      
-      await addDoc(collection(db, 'users'), {
-        name: '',
-        surname: '',
-        cf: '',
-        email: quickEmail,
-        isApproved: true,
-        uid: ''
-      });
-      setQuickEmail('');
-      setAddSuccess("Email pre-approvata con successo!");
-      setTimeout(() => setActiveTab('users'), 2000);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'users');
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#f5f5f5] p-8">
-      <div className="max-w-4xl mx-auto">
-        <header className="mb-12 flex justify-between items-end">
-          <div>
-            <h1 className="text-4xl font-light tracking-tight mb-2">Pannello Amministratore</h1>
-            <p className="text-zinc-500">Gestisci l'accesso degli utenti all'applicazione.</p>
-          </div>
-          <div className="flex gap-4">
-            {isProtectedEmail(user.email) && (
-              <button 
-                onClick={onSwitch}
-                className="flex items-center gap-2 text-zinc-500 text-sm font-medium hover:text-black transition-colors"
-              >
-                <Briefcase className="w-4 h-4" />
-                Vai alla Dashboard
-              </button>
-            )}
-            <button 
-              onClick={() => signOut(auth)}
-              className="flex items-center gap-2 text-red-500 text-sm font-medium"
-            >
-              <LogOut className="w-4 h-4" />
-              Esci
-            </button>
-          </div>
-        </header>
-
-        <div className="flex gap-8 mb-8 border-b border-zinc-200">
-          <button 
-            onClick={() => setActiveTab('users')}
-            className={`pb-4 text-sm font-medium transition-colors relative ${activeTab === 'users' ? 'text-black' : 'text-zinc-400 hover:text-zinc-600'}`}
-          >
-            Gestione Utenti
-            {activeTab === 'users' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />}
-          </button>
-          <button 
-            onClick={() => setActiveTab('add')}
-            className={`pb-4 text-sm font-medium transition-colors relative ${activeTab === 'add' ? 'text-black' : 'text-zinc-400 hover:text-zinc-600'}`}
-          >
-            Aggiungi Utente
-            {activeTab === 'add' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />}
-          </button>
-        </div>
-
-        {activeTab === 'add' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-8"
-          >
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-              <h2 className="text-xl font-medium mb-6">Pre-approva Email Google</h2>
-              <p className="text-sm text-zinc-500 mb-6">Inserisci solo l'email per permettere all'utente di accedere subito. Dovrà completare il profilo al primo accesso.</p>
-              <form onSubmit={handleQuickAdd} className="space-y-4">
-                {addError && <div className="bg-red-50 text-red-500 p-3 rounded-xl text-xs">{addError}</div>}
-                {addSuccess && <div className="bg-green-50 text-green-600 p-3 rounded-xl text-xs">{addSuccess}</div>}
-                <div>
-                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Email Google</label>
-                  <input required type="email" value={quickEmail} onChange={e => setQuickEmail(e.target.value)} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" placeholder="esempio@gmail.com" />
-                </div>
-                <button type="submit" className="w-full bg-black text-white rounded-xl py-3 font-medium hover:bg-zinc-800 transition-colors">Pre-approva Email</button>
-              </form>
-            </div>
-
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-              <h2 className="text-xl font-medium mb-6">Profilo Completo</h2>
-              <p className="text-sm text-zinc-500 mb-6">Crea un profilo completo per l'utente.</p>
-              <form onSubmit={handleManualAdd} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Nome</label>
-                    <input required value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Cognome</label>
-                    <input required value={newUser.surname} onChange={e => setNewUser({...newUser, surname: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Email</label>
-                  <input required type="email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Codice Fiscale</label>
-                  <input required maxLength={16} value={newUser.cf} onChange={e => setNewUser({...newUser, cf: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black uppercase" />
-                </div>
-                <button type="submit" className="w-full bg-zinc-100 text-zinc-600 rounded-xl py-3 font-medium hover:bg-zinc-200 transition-colors">Salva Profilo</button>
-              </form>
-            </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'users' && (
-          loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
-          </div>
-        ) : (
-          <div className="space-y-12">
-            <section>
-              <h2 className="text-xs uppercase tracking-widest text-zinc-400 mb-6">Utenti in attesa ({pendingUsers.length})</h2>
-              {pendingUsers.length === 0 ? (
-                <div className="bg-white rounded-3xl p-8 text-center border border-zinc-100 italic text-zinc-400 text-sm">
-                  Nessun utente in attesa.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {pendingUsers.map(u => (
-                    <div key={u.uid || u.email} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center">
-                      <div>
-                        <h3 className="font-medium">{u.name} {u.surname}</h3>
-                        <p className="text-sm text-zinc-500">{u.email}</p>
-                        <p className="text-xs text-zinc-400 font-mono mt-1">{u.cf}</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <button 
-                          onClick={() => toggleApproval(u.uid, u.email, true)}
-                          className="bg-black text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors"
-                        >
-                          Approva
-                        </button>
-                        {!isProtectedEmail(u.email) && (
-                          <button 
-                            onClick={() => deleteUser(u.uid, u.email)}
-                            className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section>
-              <h2 className="text-xs uppercase tracking-widest text-zinc-400 mb-6">Utenti approvati ({approvedUsers.length})</h2>
-              <div className="space-y-4">
-                {approvedUsers.map(u => (
-                  <div key={u.uid || u.email} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center">
-                    <div>
-                      <h3 className="font-medium">{u.name} {u.surname}</h3>
-                      <p className="text-sm text-zinc-500">{u.email}</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {!isProtectedEmail(u.email) && (
-                        <>
-                          <button 
-                            onClick={() => toggleApproval(u.uid, u.email, false)}
-                            className="text-zinc-500 text-sm font-medium hover:underline"
-                          >
-                            Revoca Accesso
-                          </button>
-                          <button 
-                            onClick={() => deleteUser(u.uid, u.email)}
-                            className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      {isProtectedEmail(u.email) && (
-                        <span className="text-xs uppercase tracking-widest text-zinc-400 font-medium">Admin di Sistema</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: UserProfile, onSwitchAdmin: () => void }) => {
+const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [payroll, setPayroll] = useState<PayrollEntry[]>([]);
-  const [view, setView] = useState<'list' | 'worker' | 'add-worker' | 'print-cu' | 'print-payslip'>('list');
+  const [view, setView] = useState<'list' | 'worker' | 'add-worker' | 'print-cu' | 'print-payslip' | 'admin-users' | 'admin-add'>('list');
   const [loading, setLoading] = useState(true);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollEntry | null>(null);
   const [selectedYear, setSelectedYear] = useState(2026);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+  // Admin states
+  const [pendingUsers, setPendingUsers] = useState<UserProfile[]>([]);
+  const [approvedUsers, setApprovedUsers] = useState<UserProfile[]>([]);
+  const [adminLoading, setAdminLoading] = useState(true);
+  const [adminUserForm, setAdminUserForm] = useState({ name: '', surname: '', email: '', cf: '' });
+  const [quickEmail, setQuickEmail] = useState('');
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
 
   // Form states
   const [newWorker, setNewWorker] = useState({ 
@@ -708,6 +456,30 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
     });
     return () => unsubscribe();
   }, [selectedWorker]);
+
+  // Admin Effects
+  useEffect(() => {
+    const isAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
+    if (!isAdmin) return;
+
+    const qPending = query(collection(db, 'users'), where('isApproved', '==', false));
+    const qApproved = query(collection(db, 'users'), where('isApproved', '==', true));
+    
+    const unsubPending = onSnapshot(qPending, (snapshot) => {
+      setPendingUsers(snapshot.docs.map(doc => doc.data() as UserProfile));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'users');
+    });
+    
+    const unsubApproved = onSnapshot(qApproved, (snapshot) => {
+      setApprovedUsers(snapshot.docs.map(doc => doc.data() as UserProfile));
+      setAdminLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'users');
+    });
+
+    return () => { unsubPending(); unsubApproved(); };
+  }, [user.email, profile.role]);
 
   const handleAddWorker = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -792,6 +564,94 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
     return { totGross, totThirteenth, totTfr, totalCU: totGross + totThirteenth };
   };
 
+  // Admin Handlers
+  const toggleApproval = async (uid: string, email: string, status: boolean) => {
+    if (isProtectedEmail(email)) return;
+    try {
+      await setDoc(doc(db, 'users', uid), { isApproved: status }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `users/${uid}`);
+    }
+  };
+
+  const toggleRole = async (uid: string, email: string, currentRole: 'admin' | 'user' | undefined) => {
+    if (isProtectedEmail(email)) return;
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    try {
+      await setDoc(doc(db, 'users', uid), { role: newRole }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `users/${uid}`);
+    }
+  };
+
+  const deleteUser = async (uid: string, email: string) => {
+    if (isProtectedEmail(email)) {
+      alert("Questo utente è un amministratore di sistema e non può essere rimosso.");
+      return;
+    }
+    if (!window.confirm("Sei sicuro di voler eliminare definitivamente questo utente? Tutti i suoi dati rimarranno nel database ma non potrà più accedere.")) return;
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
+    }
+  };
+
+  const handleManualAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminError(null);
+    setAdminSuccess(null);
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', adminUserForm.email));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        setAdminError("Un utente con questa email esiste già.");
+        return;
+      }
+      
+      await addDoc(collection(db, 'users'), {
+        ...adminUserForm,
+        cf: adminUserForm.cf.toUpperCase(),
+        isApproved: true,
+        uid: ''
+      });
+      setAdminUserForm({ name: '', surname: '', email: '', cf: '' });
+      setAdminSuccess("Utente aggiunto con successo!");
+      setTimeout(() => setView('admin-users'), 2000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'users');
+    }
+  };
+
+  const handleQuickAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminError(null);
+    setAdminSuccess(null);
+    if (!quickEmail) return;
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', quickEmail));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        setAdminError("Un utente con questa email esiste già.");
+        return;
+      }
+      
+      await addDoc(collection(db, 'users'), {
+        name: '',
+        surname: '',
+        cf: '',
+        email: quickEmail,
+        isApproved: true,
+        uid: ''
+      });
+      setQuickEmail('');
+      setAdminSuccess("Email pre-approvata con successo!");
+      setTimeout(() => setView('admin-users'), 2000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'users');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f5f5] flex">
       {/* Sidebar */}
@@ -819,14 +679,23 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
               <Plus className="w-4 h-4" />
               Nuovo Lavoratore
             </button>
-            {isProtectedEmail(profile.email) && (
-              <button 
-                onClick={onSwitchAdmin}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-zinc-500 hover:bg-zinc-50 transition-colors"
-              >
-                <UserIcon className="w-4 h-4" />
-                Pannello Admin
-              </button>
+            {(isProtectedEmail(profile.email) || profile.role === 'admin') && (
+              <>
+                <button 
+                  onClick={() => setView('admin-users')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'admin-users' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
+                >
+                  <Users className="w-4 h-4" />
+                  Gestione Utenti
+                </button>
+                <button 
+                  onClick={() => setView('admin-add')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'admin-add' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Aggiungi Utente
+                </button>
+              </>
             )}
           </nav>
         </div>
@@ -1372,6 +1241,156 @@ const Dashboard = ({ user, profile, onSwitchAdmin }: { user: User, profile: User
             </motion.div>
           )}
 
+          {view === 'admin-add' && (
+            <motion.div 
+              key="admin-add"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="max-w-4xl"
+            >
+              <h1 className="text-4xl font-light tracking-tight mb-8">Aggiungi Utente</h1>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
+                  <h2 className="text-xl font-medium mb-6">Pre-approva Email Google</h2>
+                  <p className="text-sm text-zinc-500 mb-6">Inserisci solo l'email per permettere all'utente di accedere subito. Dovrà completare il profilo al primo accesso.</p>
+                  <form onSubmit={handleQuickAdd} className="space-y-4">
+                    {adminError && <div className="bg-red-50 text-red-500 p-3 rounded-xl text-xs">{adminError}</div>}
+                    {adminSuccess && <div className="bg-green-50 text-green-600 p-3 rounded-xl text-xs">{adminSuccess}</div>}
+                    <div>
+                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Email Google</label>
+                      <input required type="email" value={quickEmail} onChange={e => setQuickEmail(e.target.value)} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" placeholder="esempio@gmail.com" />
+                    </div>
+                    <button type="submit" className="w-full bg-black text-white rounded-xl py-3 font-medium hover:bg-zinc-800 transition-colors">Pre-approva Email</button>
+                  </form>
+                </div>
+
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
+                  <h2 className="text-xl font-medium mb-6">Profilo Completo</h2>
+                  <p className="text-sm text-zinc-500 mb-6">Crea un profilo completo per l'utente.</p>
+                  <form onSubmit={handleManualAdd} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Nome</label>
+                        <input required value={adminUserForm.name} onChange={e => setAdminUserForm({...adminUserForm, name: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Cognome</label>
+                        <input required value={adminUserForm.surname} onChange={e => setAdminUserForm({...adminUserForm, surname: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Email</label>
+                      <input required type="email" value={adminUserForm.email} onChange={e => setAdminUserForm({...adminUserForm, email: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Codice Fiscale</label>
+                      <input required maxLength={16} value={adminUserForm.cf} onChange={e => setAdminUserForm({...adminUserForm, cf: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black uppercase" />
+                    </div>
+                    <button type="submit" className="w-full bg-zinc-100 text-zinc-600 rounded-xl py-3 font-medium hover:bg-zinc-200 transition-colors">Salva Profilo</button>
+                  </form>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {view === 'admin-users' && (
+            <motion.div 
+              key="admin-users"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="max-w-4xl"
+            >
+              <h1 className="text-4xl font-light tracking-tight mb-8">Gestione Utenti</h1>
+              {adminLoading ? (
+                <div className="flex justify-center py-20">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+                </div>
+              ) : (
+                <div className="space-y-12">
+                  <section>
+                    <h2 className="text-xs uppercase tracking-widest text-zinc-400 mb-6">Utenti in attesa ({pendingUsers.length})</h2>
+                    {pendingUsers.length === 0 ? (
+                      <div className="bg-white rounded-3xl p-8 text-center border border-zinc-100 italic text-zinc-400 text-sm">
+                        Nessun utente in attesa.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {pendingUsers.map(u => (
+                          <div key={u.uid || u.email} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center">
+                            <div>
+                              <h3 className="font-medium">{u.name} {u.surname}</h3>
+                              <p className="text-sm text-zinc-500">{u.email}</p>
+                              <p className="text-xs text-zinc-400 font-mono mt-1">{u.cf}</p>
+                            </div>
+                            <div className="flex gap-3">
+                              <button 
+                                onClick={() => toggleApproval(u.uid, u.email, true)}
+                                className="bg-black text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors"
+                              >
+                                Approva
+                              </button>
+                              {!isProtectedEmail(u.email) && (
+                                <button 
+                                  onClick={() => deleteUser(u.uid, u.email)}
+                                  className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section>
+                    <h2 className="text-xs uppercase tracking-widest text-zinc-400 mb-6">Utenti approvati ({approvedUsers.length})</h2>
+                    <div className="space-y-4">
+                      {approvedUsers.map(u => (
+                        <div key={u.uid || u.email} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center">
+                          <div>
+                            <h3 className="font-medium">{u.name} {u.surname}</h3>
+                            <p className="text-sm text-zinc-500">{u.email}</p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            {!isProtectedEmail(u.email) && (
+                              <>
+                                <button 
+                                  onClick={() => toggleRole(u.uid, u.email, u.role)}
+                                  className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${u.role === 'admin' ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+                                >
+                                  {u.role === 'admin' ? 'Admin' : 'Rendi Admin'}
+                                </button>
+                                <button 
+                                  onClick={() => toggleApproval(u.uid, u.email, false)}
+                                  className="text-zinc-500 text-sm font-medium hover:underline"
+                                >
+                                  Revoca Accesso
+                                </button>
+                                <button 
+                                  onClick={() => deleteUser(u.uid, u.email)}
+                                  className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                            {isProtectedEmail(u.email) && (
+                              <span className="text-xs uppercase tracking-widest text-zinc-400 font-medium">Admin di Sistema</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {view === 'print-cu' && selectedWorker && (
             <motion.div 
               key="print-cu"
@@ -1469,10 +1488,14 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
+
+    // Handle redirect result
+    getRedirectResult(auth).catch((error) => {
+      console.error("Redirect result error:", error);
+    });
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -1535,15 +1558,11 @@ function AppContent() {
   if (!user) return <Login />;
   if (!profile || !profile.name || !profile.surname || !profile.cf) return <ProfileSetup user={user} profile={profile} onComplete={() => window.location.reload()} />;
 
-  const isAdmin = isProtectedEmail(user.email);
+  const isAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
 
   if (!profile.isApproved && !isAdmin) {
     return <WaitingForApproval onSignOut={() => signOut(auth)} />;
   }
 
-  if (isAdmin && showAdmin) {
-    return <AdminDashboard user={user} onSwitch={() => setShowAdmin(false)} />;
-  }
-
-  return <Dashboard user={user} profile={profile} onSwitchAdmin={() => setShowAdmin(true)} />;
+  return <Dashboard user={user} profile={profile} />;
 }
