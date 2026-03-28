@@ -676,7 +676,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               <Users className="w-4 h-4" />
               Lavoratori
             </button>
-            {profile.role === 'user' && (
+            {(profile.role === 'user' || actualIsAdmin) && (
               <button 
                 onClick={() => { setView('add-worker')} }
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'add-worker' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
@@ -692,7 +692,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'admin-users' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
                 >
                   <Users className="w-4 h-4" />
-                  Gestione Utenti
+                  Utenti Profilati
                 </button>
                 <button 
                   onClick={() => setView('admin-add')}
@@ -1395,7 +1395,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <h1 className="text-4xl font-light tracking-tight mb-8">Gestione Utenti</h1>
+              <h1 className="text-4xl font-light tracking-tight mb-8">Utenti Profilati</h1>
               {adminLoading ? (
                 <div className="flex justify-center py-20">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>

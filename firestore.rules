@@ -124,7 +124,7 @@ service cloud.firestore {
 
     match /workers/{workerId} {
       allow read: if isApproved() && (resource.data.managerId == request.auth.uid || isAdmin());
-      allow create: if isApproved() && isUser() && isValidWorker(request.resource.data);
+      allow create: if isApproved() && (isUser() || isAdmin()) && isValidWorker(request.resource.data);
       allow update: if isApproved() && (resource.data.managerId == request.auth.uid && isValidWorker(request.resource.data)) || isAdmin();
       allow delete: if isApproved() && (resource.data.managerId == request.auth.uid || isAdmin());
     }
