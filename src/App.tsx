@@ -22,8 +22,6 @@ import {
 import { 
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signOut, 
   onAuthStateChanged,
   User
@@ -197,12 +195,11 @@ const Login = () => {
       prompt: 'select_account'
     });
 
-    // Calling signInWithPopup directly in the click handler to maximize chances of success
     signInWithPopup(auth, provider)
       .catch((err: any) => {
         console.error("Login error:", err);
         if (err.code === 'auth/popup-blocked') {
-          setError('Il popup di accesso è stato bloccato dal browser. Per favore, abilita i popup per questo sito o apri l\'applicazione in una nuova scheda cliccando sull\'icona "Open in new tab" in alto a destra nel pannello di anteprima.');
+          setError('Il popup di accesso è stato bloccato dal browser. Clicca sul link qui sotto per aprire l\'app in una nuova scheda e riprovare.');
           setLoading(false);
         } else if (err.code === 'auth/popup-closed-by-user') {
           setError('Accesso annullato. Riprova se desideri entrare.');
@@ -283,6 +280,25 @@ const ProfileSetup = ({ user, profile, onComplete }: { user: User, profile: User
   const [cf, setCf] = useState(profile?.cf || '');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const fetchPreApprovedData = async () => {
+      if (user.email && !profile) {
+        try {
+          const docSnap = await getDoc(doc(db, 'preapproved_emails', user.email));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.name) setName(data.name);
+            if (data.surname) setSurname(data.surname);
+            if (data.cf) setCf(data.cf);
+          }
+        } catch (error) {
+          console.error("Error fetching pre-approved data:", error);
+        }
+      }
+    };
+    fetchPreApprovedData();
+  }, [user.email, profile]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cf.length !== 16) {
@@ -291,14 +307,34 @@ const ProfileSetup = ({ user, profile, onComplete }: { user: User, profile: User
     
     setLoading(true);
     try {
+      let isPreApproved = false;
+      if (user.email) {
+        try {
+          const preapprovedDoc = await getDoc(doc(db, 'preapproved_emails', user.email));
+          isPreApproved = preapprovedDoc.exists();
+        } catch (error) {
+          console.error("Error checking pre-approval:", error);
+        }
+      }
+
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
         name,
         surname,
         cf: cf.toUpperCase(),
         email: user.email,
-        isApproved: profile?.isApproved || isProtectedEmail(user.email)
-      });
+        isApproved: profile?.isApproved || isProtectedEmail(user.email) || isPreApproved,
+        role: profile?.role || (isProtectedEmail(user.email) ? 'admin' : 'user')
+      }, { merge: true });
+      
+      if (isPreApproved && user.email) {
+        try {
+          await deleteDoc(doc(db, 'preapproved_emails', user.email));
+        } catch (error) {
+          console.error("Error deleting pre-approval:", error);
+        }
+      }
+      
       onComplete();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
@@ -565,6 +601,8 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   };
 
   // Admin Handlers
+  const [userToDelete, setUserToDelete] = useState<{uid: string, email: string} | null>(null);
+
   const toggleApproval = async (uid: string, email: string, status: boolean) => {
     if (isProtectedEmail(email)) return;
     try {
@@ -584,16 +622,22 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
     }
   };
 
-  const deleteUser = async (uid: string, email: string) => {
+  const confirmDeleteUser = (uid: string, email: string) => {
     if (isProtectedEmail(email)) {
-      alert("Questo utente è un amministratore di sistema e non può essere rimosso.");
+      setAdminError("Questo utente è un amministratore di sistema e non può essere rimosso.");
+      setTimeout(() => setAdminError(null), 3000);
       return;
     }
-    if (!window.confirm("Sei sicuro di voler eliminare definitivamente questo utente? Tutti i suoi dati rimarranno nel database ma non potrà più accedere.")) return;
+    setUserToDelete({ uid, email });
+  };
+
+  const executeDeleteUser = async () => {
+    if (!userToDelete) return;
     try {
-      await deleteDoc(doc(db, 'users', uid));
+      await deleteDoc(doc(db, 'users', userToDelete.uid));
+      setUserToDelete(null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
+      handleFirestoreError(error, OperationType.DELETE, `users/${userToDelete.uid}`);
     }
   };
 
@@ -609,17 +653,20 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
         return;
       }
       
-      await addDoc(collection(db, 'users'), {
-        ...adminUserForm,
+      await setDoc(doc(db, 'preapproved_emails', adminUserForm.email), {
+        email: adminUserForm.email,
+        name: adminUserForm.name,
+        surname: adminUserForm.surname,
         cf: adminUserForm.cf.toUpperCase(),
-        isApproved: true,
-        uid: ''
+        addedAt: new Date().toISOString(),
+        addedBy: user.uid
       });
+      
       setAdminUserForm({ name: '', surname: '', email: '', cf: '' });
       setAdminSuccess("Utente aggiunto con successo!");
       setTimeout(() => setView('admin-users'), 2000);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'users');
+      handleFirestoreError(error, OperationType.WRITE, 'preapproved_emails');
     }
   };
 
@@ -636,19 +683,16 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
         return;
       }
       
-      await addDoc(collection(db, 'users'), {
-        name: '',
-        surname: '',
-        cf: '',
+      await setDoc(doc(db, 'preapproved_emails', quickEmail), {
         email: quickEmail,
-        isApproved: true,
-        uid: ''
+        addedAt: new Date().toISOString(),
+        addedBy: user.uid
       });
       setQuickEmail('');
       setAdminSuccess("Email pre-approvata con successo!");
       setTimeout(() => setView('admin-users'), 2000);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'users');
+      handleFirestoreError(error, OperationType.WRITE, 'preapproved_emails');
     }
   };
 
@@ -1333,7 +1377,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                               </button>
                               {!isProtectedEmail(u.email) && (
                                 <button 
-                                  onClick={() => deleteUser(u.uid, u.email)}
+                                  onClick={() => confirmDeleteUser(u.uid, u.email)}
                                   className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -1371,7 +1415,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                                   Revoca Accesso
                                 </button>
                                 <button 
-                                  onClick={() => deleteUser(u.uid, u.email)}
+                                  onClick={() => confirmDeleteUser(u.uid, u.email)}
                                   className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -1388,6 +1432,44 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                   </section>
                 </div>
               )}
+
+              {/* User Deletion Confirmation Modal */}
+              <AnimatePresence>
+                {userToDelete && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                  >
+                    <motion.div 
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.95, opacity: 0 }}
+                      className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl"
+                    >
+                      <h3 className="text-xl font-medium mb-4">Conferma Eliminazione</h3>
+                      <p className="text-zinc-500 mb-8">
+                        Sei sicuro di voler eliminare definitivamente l'utente <span className="font-medium text-black">{userToDelete.email}</span>? Tutti i suoi dati rimarranno nel database ma non potrà più accedere.
+                      </p>
+                      <div className="flex justify-end gap-3">
+                        <button 
+                          onClick={() => setUserToDelete(null)}
+                          className="px-6 py-3 rounded-xl text-sm font-medium text-zinc-600 hover:bg-zinc-100 transition-colors"
+                        >
+                          Annulla
+                        </button>
+                        <button 
+                          onClick={executeDeleteUser}
+                          className="bg-red-500 text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-red-600 transition-colors"
+                        >
+                          Elimina Utente
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
 
@@ -1492,11 +1574,6 @@ function AppContent() {
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
 
-    // Handle redirect result
-    getRedirectResult(auth).catch((error) => {
-      console.error("Redirect result error:", error);
-    });
-
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       
@@ -1512,24 +1589,8 @@ function AppContent() {
             setProfile(docSnap.data() as UserProfile);
             setLoading(false);
           } else {
-            // Check if there's a pre-created profile by email
-            const q = query(collection(db, 'users'), where('email', '==', currentUser.email), where('uid', '==', ''));
-            const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-              const preCreatedDoc = snapshot.docs[0];
-              const preCreatedData = preCreatedDoc.data() as UserProfile;
-              // Link the profile to the new UID
-              await setDoc(doc(db, 'users', currentUser.uid), {
-                ...preCreatedData,
-                uid: currentUser.uid
-              });
-              // Delete the old pre-created doc
-              await deleteDoc(preCreatedDoc.ref);
-              // Profile will be updated by the next snapshot
-            } else {
-              setProfile(null);
-              setLoading(false);
-            }
+            setProfile(null);
+            setLoading(false);
           }
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);

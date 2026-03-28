@@ -61,12 +61,13 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.keys().hasAll(['name', 'surname', 'cf', 'email', 'isApproved']) &&
+      return data.keys().hasAll(['name', 'surname', 'cf', 'email', 'isApproved', 'role']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.surname is string && data.surname.size() > 0 && data.surname.size() < 100 &&
              data.cf is string && data.cf.size() == 16 &&
              data.email is string &&
-             data.isApproved is bool;
+             data.isApproved is bool &&
+             (data.role == 'user' || data.role == 'admin');
     }
 
     function isValidWorker(data) {
@@ -97,10 +98,18 @@ service cloud.firestore {
     // Match Rules
     // ===============================================================
 
+    match /preapproved_emails/{email} {
+      allow read: if isAuthenticated() && request.auth.token.email == email || isAdmin();
+      allow write: if isAdmin();
+      allow delete: if isAuthenticated() && request.auth.token.email == email;
+    }
+
     match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
-      allow create: if isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.isApproved == false;
-      allow update: if (isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.isApproved == resource.data.isApproved) || isAdmin();
+      allow read: if isOwner(uid) || isAdmin() || (isAuthenticated() && resource.data.email == request.auth.token.email);
+      allow create: if isOwner(uid) && isValidUser(request.resource.data) && 
+        (request.resource.data.isApproved == false || exists(/databases/$(database)/documents/preapproved_emails/$(request.auth.token.email))) &&
+        (request.resource.data.role == 'user' || isAdmin());
+      allow update: if (isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.isApproved == resource.data.isApproved && request.resource.data.role == resource.data.role) || isAdmin();
     }
 
     match /workers/{workerId} {
