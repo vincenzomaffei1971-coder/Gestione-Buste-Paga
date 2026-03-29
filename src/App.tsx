@@ -465,12 +465,25 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
       return;
     }
 
+    const workerCf = newWorker.cf.trim().toUpperCase();
+    const employerCf = newWorker.employerCf.trim().toUpperCase();
+
+    if (workerCf.length !== 16) {
+      setFormError("Il Codice Fiscale del lavoratore deve essere di 16 caratteri.");
+      return;
+    }
+
+    if (employerCf.length !== 16) {
+      setFormError("Il Codice Fiscale del datore deve essere di 16 caratteri.");
+      return;
+    }
+
     try {
       await addDoc(collection(db, 'workers'), {
         ...newWorker,
         managerId: user.uid,
-        cf: newWorker.cf.toUpperCase(),
-        employerCf: newWorker.employerCf.toUpperCase()
+        cf: workerCf,
+        employerCf: employerCf
       });
       setNewWorker({ 
         name: '', 

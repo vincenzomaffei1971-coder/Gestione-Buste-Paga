@@ -51,29 +51,34 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          ((request.auth.token.email == "vincenzomaffei1971@gmail.com" || request.auth.token.email == "vincenzo.maffei@gmail.com" || request.auth.token.email == "vincenzo.maffei-1971@gmail.com") && request.auth.token.email_verified == true));
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          ((request.auth.token.email == "vincenzomaffei1971@gmail.com" || request.auth.token.email == "vincenzo.maffei@gmail.com" || request.auth.token.email == "vincenzo.maffei-1971@gmail.com") && request.auth.token.email_verified == true)
+        );
     }
 
     function isUser() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'user');
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'user');
     }
 
     function isApproved() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true || isAdmin());
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true) || 
+          isAdmin()
+        );
     }
 
     function isProtectedUser(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data.email == "vincenzomaffei1971@gmail.com";
+      return exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.email == "vincenzomaffei1971@gmail.com";
     }
 
     function isValidUser(data) {
       return data.keys().hasAll(['name', 'surname', 'cf', 'email', 'isApproved', 'role']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.surname is string && data.surname.size() > 0 && data.surname.size() < 100 &&
-             data.cf is string && data.cf.size() == 16 &&
+             data.cf is string && (data.cf.size() == 16 || data.cf.size() == 0) &&
              data.email is string &&
              data.isApproved is bool &&
              (data.role == 'user' || data.role == 'admin');
@@ -86,7 +91,11 @@ service cloud.firestore {
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.surname is string && data.surname.size() > 0 && data.surname.size() < 100 &&
              data.cf is string && data.cf.size() == 16 &&
-             data.relationshipNumber is string && data.relationshipNumber.size() > 0;
+             data.relationshipNumber is string && data.relationshipNumber.size() > 0 &&
+             data.employerName is string &&
+             data.employerSurname is string &&
+             data.employerCf is string &&
+             data.title is string;
     }
 
     function isValidPayroll(data) {
