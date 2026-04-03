@@ -223,8 +223,8 @@ const Login = () => {
         className="bg-white p-8 rounded-3xl shadow-sm max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Briefcase className="text-white w-8 h-8" />
+          <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-6">
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
           <h1 className="text-3xl font-light tracking-tight mb-2">Gestionale Busta Paga</h1>
           <p className="text-zinc-500">Accedi con il tuo account Google</p>
@@ -767,8 +767,8 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
       <aside className="w-64 bg-white border-r border-zinc-100 flex flex-col print:hidden">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center">
-              <Briefcase className="text-white w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <span className="font-medium tracking-tight">Busta Paga Colf</span>
           </div>

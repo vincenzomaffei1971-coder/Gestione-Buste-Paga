@@ -75,13 +75,14 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.keys().hasAll(['name', 'surname', 'cf', 'email', 'isApproved', 'role']) &&
+      return data.keys().hasAll(['name', 'surname', 'cf', 'email', 'isApproved', 'role', 'uid']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.surname is string && data.surname.size() > 0 && data.surname.size() < 100 &&
+             data.surname is string && data.surname.size() >= 0 && data.surname.size() < 100 &&
              data.cf is string && (data.cf.size() == 16 || data.cf.size() == 0) &&
              data.email is string &&
              data.isApproved is bool &&
-             (data.role == 'user' || data.role == 'admin');
+             (data.role == 'user' || data.role == 'admin') &&
+             data.uid is string && data.uid == request.auth.uid;
     }
 
     function isValidWorker(data) {
