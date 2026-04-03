@@ -46,6 +46,7 @@ import {
   Worker, 
   PayrollEntry, 
   TfrYearlyData,
+  HolidayYearlyData,
   MONTHS, 
   YEARS, 
   calculatePayroll,
@@ -344,6 +345,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [payroll, setPayroll] = useState<PayrollEntry[]>([]);
   const [tfrYearlyData, setTfrYearlyData] = useState<TfrYearlyData[]>([]);
+  const [holidayYearlyData, setHolidayYearlyData] = useState<HolidayYearlyData[]>([]);
   const [view, setView] = useState<'list' | 'worker' | 'add-worker' | 'print-cu' | 'print-payslip' | 'admin-users' | 'admin-add' | 'admin-preapproved'>('list');
   const [loading, setLoading] = useState(true);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollEntry | null>(null);
@@ -367,11 +369,23 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
     cf: '', 
     relationshipNumber: '', 
     title: '',
+    level: 'A' as 'A' | 'B' | 'C' | 'D',
+    isSuper: false,
+    contractHoursPerWeek: 40,
     employerName: profile.name || '',
     employerSurname: profile.surname || '',
     employerCf: profile.cf || ''
   });
-  const [newPayroll, setNewPayroll] = useState({ year: 2026, month: 'Marzo', hourlyRate: 10, hoursWorked: 0 });
+  const [newPayroll, setNewPayroll] = useState({ 
+    year: 2026, 
+    month: 'Marzo', 
+    hourlyRate: 10, 
+    hoursWorked: 0, 
+    weeksWorked: 4, 
+    holidayTaken: 0, 
+    isThirteenthPayment: false,
+    includeWorkerContributionsInPayslip: false
+  });
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -420,6 +434,17 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
       setTfrYearlyData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TfrYearlyData)));
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'tfr_yearly');
+    });
+    return () => unsubscribe();
+  }, [selectedWorker]);
+
+  useEffect(() => {
+    if (!selectedWorker) return;
+    const q = query(collection(db, 'holiday_yearly'), where('workerId', '==', selectedWorker.id));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setHolidayYearlyData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as HolidayYearlyData)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'holiday_yearly');
     });
     return () => unsubscribe();
   }, [selectedWorker]);
@@ -491,6 +516,9 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
         cf: '', 
         relationshipNumber: '', 
         title: '',
+        level: 'A',
+        isSuper: false,
+        contractHoursPerWeek: 40,
         employerName: profile.name || '',
         employerSurname: profile.surname || '',
         employerCf: profile.cf || ''
@@ -504,7 +532,27 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   const handleAddPayroll = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedWorker) return;
-    const { grossPay, thirteenth, tfr } = calculatePayroll(newPayroll.hourlyRate, newPayroll.hoursWorked);
+    
+    // Get previous holiday balance
+    const workerPayroll = payroll.filter(p => p.workerId === selectedWorker.id);
+    const sortedPayroll = [...workerPayroll].sort((a, b) => {
+      const yearDiff = b.year - a.year;
+      if (yearDiff !== 0) return yearDiff;
+      return MONTHS.indexOf(b.month) - MONTHS.indexOf(a.month);
+    });
+    const lastEntry = sortedPayroll[0];
+    const previousBalance = lastEntry ? lastEntry.holidayBalance : 0;
+
+    const { grossPay, thirteenth, tfr, holidayAccrued, holidayBalance, contributions } = calculatePayroll(
+      newPayroll.hourlyRate, 
+      newPayroll.hoursWorked,
+      newPayroll.weeksWorked,
+      selectedWorker.contractHoursPerWeek || 0,
+      previousBalance,
+      newPayroll.holidayTaken,
+      newPayroll.includeWorkerContributionsInPayslip
+    );
+
     try {
       await addDoc(collection(db, 'payroll'), {
         ...newPayroll,
@@ -512,9 +560,31 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
         managerId: user.uid,
         grossPay,
         thirteenth,
-        tfr
+        tfr,
+        holidayAccrued,
+        holidayBalance,
+        totalContributions: contributions.total,
+        workerContributions: contributions.worker,
+        employerContributions: contributions.employer
       });
-      setNewPayroll({ ...newPayroll, hoursWorked: 0 });
+      
+      // Update holiday yearly summary
+      const year = newPayroll.year;
+      const yearPayroll = [...workerPayroll, { ...newPayroll, holidayAccrued, holidayTaken: newPayroll.holidayTaken }].filter(p => p.year === year);
+      const accrued = yearPayroll.reduce((acc, p) => acc + (p.holidayAccrued || 0), 0);
+      const taken = yearPayroll.reduce((acc, p) => acc + (p.holidayTaken || 0), 0);
+      const balance = accrued - taken;
+      
+      const holidayId = `${selectedWorker.id}_${year}`;
+      await setDoc(doc(db, 'holiday_yearly', holidayId), {
+        workerId: selectedWorker.id,
+        year,
+        accrued,
+        taken,
+        balance
+      }, { merge: true });
+
+      setNewPayroll({ ...newPayroll, hoursWorked: 0, holidayTaken: 0, isThirteenthPayment: false });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'payroll');
     }
@@ -554,6 +624,28 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
       }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `tfr_yearly/${id}`);
+    }
+  };
+
+  const updateWorkerLevel = async (level: 'A' | 'B' | 'C' | 'D', isSuper: boolean) => {
+    if (!selectedWorker) return;
+    const safeLevel = level || 'A';
+    const safeIsSuper = isSuper || false;
+    try {
+      await setDoc(doc(db, 'workers', selectedWorker.id), { level: safeLevel, isSuper: safeIsSuper }, { merge: true });
+      setSelectedWorker({ ...selectedWorker, level: safeLevel, isSuper: safeIsSuper });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `workers/${selectedWorker.id}`);
+    }
+  };
+
+  const updateWorkerContract = async (hours: number) => {
+    if (!selectedWorker) return;
+    try {
+      await setDoc(doc(db, 'workers', selectedWorker.id), { contractHoursPerWeek: hours }, { merge: true });
+      setSelectedWorker({ ...selectedWorker, contractHoursPerWeek: hours });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `workers/${selectedWorker.id}`);
     }
   };
 
@@ -928,6 +1020,49 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Livello</label>
+                    <select 
+                      required
+                      value={newWorker.level}
+                      onChange={e => setNewWorker({...newWorker, level: e.target.value as any})}
+                      className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
+                    >
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                      <option value="D">D</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Ore Settimanali (Contratto)</label>
+                    <input 
+                      required
+                      type="number"
+                      value={newWorker.contractHoursPerWeek}
+                      onChange={e => setNewWorker({...newWorker, contractHoursPerWeek: parseFloat(e.target.value) || 0})}
+                      className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-end pb-4">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input 
+                          type="checkbox"
+                          checked={newWorker.isSuper}
+                          onChange={e => setNewWorker({...newWorker, isSuper: e.target.checked})}
+                          className="sr-only"
+                        />
+                        <div className={`w-10 h-6 rounded-full transition-colors ${newWorker.isSuper ? 'bg-black' : 'bg-zinc-200'}`} />
+                        <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${newWorker.isSuper ? 'translate-x-4' : ''}`} />
+                      </div>
+                      <span className="text-sm font-medium text-zinc-600 group-hover:text-black transition-colors">Opzione Super</span>
+                    </label>
+                  </div>
+
                 <div>
                   <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Nr Rapporto</label>
                   <input 
@@ -959,6 +1094,30 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                   </button>
                   <h1 className="text-4xl font-light tracking-tight">{selectedWorker.title}</h1>
                   <p className="text-zinc-500 mt-1">{selectedWorker.name} {selectedWorker.surname} — Nr. Rapporto: {selectedWorker.relationshipNumber}</p>
+                  <div className="flex items-center gap-4 mt-4">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] uppercase tracking-widest text-zinc-400">Livello:</label>
+                      <select 
+                        value={selectedWorker.level || 'A'}
+                        onChange={(e) => updateWorkerLevel(e.target.value as any, selectedWorker.isSuper || false)}
+                        className="bg-zinc-100 border-none rounded-lg px-2 py-1 text-xs font-bold focus:ring-1 focus:ring-black outline-none"
+                      >
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                      </select>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input 
+                        type="checkbox"
+                        checked={selectedWorker.isSuper || false}
+                        onChange={(e) => updateWorkerLevel(selectedWorker.level || 'A', e.target.checked)}
+                        className="rounded border-zinc-300 text-black focus:ring-black"
+                      />
+                      <span className="text-[10px] uppercase tracking-widest text-zinc-400 group-hover:text-black transition-colors">Super</span>
+                    </label>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {showDeleteConfirm === selectedWorker.id ? (
@@ -990,7 +1149,33 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
                 {/* Payroll Entry Form */}
-                <div className="lg:col-span-1">
+                <div className="lg:col-span-1 space-y-6">
+                  {/* Contract Details Card */}
+                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-medium flex items-center gap-2">
+                        <Briefcase className="w-4 h-4 text-zinc-400" />
+                        Dati Contrattuali
+                      </h3>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Ore settimanali da contratto</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="number"
+                            value={selectedWorker.contractHoursPerWeek || 0}
+                            onChange={(e) => updateWorkerContract(parseFloat(e.target.value) || 0)}
+                            className="flex-1 bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
+                          />
+                          <div className="bg-zinc-100 px-4 flex items-center rounded-xl text-xs font-medium text-zinc-500">
+                            h/sett
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 sticky top-8">
                     <h3 className="text-lg font-medium mb-6 flex items-center gap-2">
                       <Calculator className="w-5 h-5" />
@@ -1002,7 +1187,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                           <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Anno</label>
                           <select 
                             value={newPayroll.year}
-                            onChange={e => setNewPayroll({...newPayroll, year: parseInt(e.target.value)})}
+                            onChange={e => setNewPayroll({...newPayroll, year: parseInt(e.target.value) || 2026})}
                             className="w-full bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
                           >
                             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
@@ -1025,20 +1210,68 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                           type="number"
                           step="0.01"
                           value={newPayroll.hourlyRate}
-                          onChange={e => setNewPayroll({...newPayroll, hourlyRate: parseFloat(e.target.value)})}
+                          onChange={e => setNewPayroll({...newPayroll, hourlyRate: parseFloat(e.target.value) || 0})}
                           className="w-full bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
                         />
                       </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Ore Lavorate</label>
+                          <input 
+                            type="number"
+                            step="0.5"
+                            readOnly
+                            value={newPayroll.hoursWorked}
+                            className="w-full bg-zinc-100 border-none rounded-xl p-3 text-sm focus:ring-0 outline-none cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Settimane Lav.</label>
+                          <select 
+                            value={newPayroll.weeksWorked}
+                            onChange={e => {
+                              const weeks = parseInt(e.target.value) || 0;
+                              const calculatedHours = weeks * (selectedWorker?.contractHoursPerWeek || 0);
+                              setNewPayroll({...newPayroll, weeksWorked: weeks, hoursWorked: calculatedHours});
+                            }}
+                            className="w-full bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
+                          >
+                            {[0, 1, 2, 3, 4, 5].map(w => <option key={w} value={w}>{w}</option>)}
+                          </select>
+                        </div>
+                      </div>
                       <div>
-                        <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Ore Lavorate</label>
+                        <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Ferie Godute (gg)</label>
                         <input 
                           type="number"
                           step="0.5"
-                          value={newPayroll.hoursWorked}
-                          onChange={e => setNewPayroll({...newPayroll, hoursWorked: parseFloat(e.target.value)})}
+                          value={newPayroll.holidayTaken}
+                          onChange={e => setNewPayroll({...newPayroll, holidayTaken: parseFloat(e.target.value) || 0})}
                           className="w-full bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
                         />
                       </div>
+                      
+                      <div className="flex flex-col gap-2 py-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="checkbox"
+                            checked={newPayroll.isThirteenthPayment}
+                            onChange={e => setNewPayroll({...newPayroll, isThirteenthPayment: e.target.checked})}
+                            className="rounded border-zinc-300 text-black focus:ring-black"
+                          />
+                          <span className="text-xs text-zinc-600">Pagamento Tredicesima</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="checkbox"
+                            checked={newPayroll.includeWorkerContributionsInPayslip}
+                            onChange={e => setNewPayroll({...newPayroll, includeWorkerContributionsInPayslip: e.target.checked})}
+                            className="rounded border-zinc-300 text-black focus:ring-black"
+                          />
+                          <span className="text-xs text-zinc-600">Quota contributi spettante al lavoratore</span>
+                        </label>
+                      </div>
+
                       <button className="w-full bg-black text-white rounded-xl py-3 text-sm font-medium hover:bg-zinc-800 transition-colors">
                         Salva nel Registro
                       </button>
@@ -1060,7 +1293,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                       <div className="flex gap-2">
                         <select 
                           value={selectedYear}
-                          onChange={e => setSelectedYear(parseInt(e.target.value))}
+                          onChange={e => setSelectedYear(parseInt(e.target.value) || 2026)}
                           className="bg-zinc-50 border-none rounded-xl px-3 text-xs outline-none"
                         >
                           {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
@@ -1126,7 +1359,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                                     type="number"
                                     step="0.1"
                                     value={tfrData.revaluationRate}
-                                    onChange={(e) => updateTfrYearly(year, parseFloat(e.target.value), tfrData.isPaid)}
+                                    onChange={(e) => updateTfrYearly(year, parseFloat(e.target.value) || 0, tfrData.isPaid)}
                                     className="w-16 bg-zinc-50 border-none rounded-lg p-1 text-xs focus:ring-1 focus:ring-black outline-none font-mono"
                                   />
                                 </td>
@@ -1216,6 +1449,74 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                       </table>
                     </div>
                   </div>
+
+                  {/* Ferie and Tredicesima Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                          <Calculator className="text-blue-500 w-5 h-5" />
+                        </div>
+                        <h3 className="text-lg font-medium">Calcolo Ferie</h3>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-end pb-4 border-b border-zinc-50">
+                          <span className="text-sm text-zinc-500">Maturate {selectedYear}</span>
+                          <span className="font-mono font-medium">
+                            {(holidayYearlyData.find(h => h.year === selectedYear)?.accrued || 0).toFixed(2)} h
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-end pb-4 border-b border-zinc-50">
+                          <span className="text-sm text-zinc-500">Godute {selectedYear}</span>
+                          <span className="font-mono font-medium text-red-500">
+                            {(holidayYearlyData.find(h => h.year === selectedYear)?.taken || 0).toFixed(1)} h
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-end pt-2">
+                          <span className="text-base font-bold">Residuo {selectedYear}</span>
+                          <span className="text-xl font-mono font-bold text-green-600">
+                            {(holidayYearlyData.find(h => h.year === selectedYear)?.balance || 0).toFixed(2)} h
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-zinc-400 mt-4 italic">
+                          * Maturazione: (Ore settimanali * 4.333) / 12 al mese.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                          <TrendingUp className="text-amber-500 w-5 h-5" />
+                        </div>
+                        <h3 className="text-lg font-medium">Calcolo Tredicesima</h3>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-end pb-4 border-b border-zinc-50">
+                          <span className="text-sm text-zinc-500">Accantonato {selectedYear}</span>
+                          <span className="font-mono font-medium">
+                            {payroll.filter(p => p.year === selectedYear).reduce((acc, p) => acc + p.thirteenth, 0).toFixed(2)} €
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-end pb-4 border-b border-zinc-50">
+                          <span className="text-sm text-zinc-500">Già Pagata</span>
+                          <span className="font-mono font-medium text-green-600">
+                            {payroll.filter(p => p.year === selectedYear && p.isThirteenthPayment).reduce((acc, p) => acc + p.grossPay, 0).toFixed(2)} €
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-end pt-2">
+                          <span className="text-base font-bold">Saldo da Pagare</span>
+                          <span className="text-xl font-mono font-bold text-amber-600">
+                            {(payroll.filter(p => p.year === selectedYear).reduce((acc, p) => acc + p.thirteenth, 0) - 
+                              payroll.filter(p => p.year === selectedYear && p.isThirteenthPayment).reduce((acc, p) => acc + p.grossPay, 0)).toFixed(2)} €
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-zinc-400 mt-4 italic">
+                          * Il calcolo si basa sui ratei mensili maturati (Lordo / 12).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -1253,8 +1554,13 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                     <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-3">Lavoratore</h4>
                     <p className="text-lg font-bold leading-tight">{selectedWorker.name} {selectedWorker.surname}</p>
                     <p className="text-sm font-mono text-zinc-500 mt-1">{selectedWorker.cf}</p>
-                    <div className="mt-3 inline-block px-2 py-1 bg-zinc-50 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-500 border border-zinc-100">
-                      Nr Rapporto: {selectedWorker.relationshipNumber}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="px-2 py-1 bg-zinc-50 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-500 border border-zinc-100">
+                        Nr Rapporto: {selectedWorker.relationshipNumber}
+                      </div>
+                      <div className="px-2 py-1 bg-zinc-50 border border-zinc-200 rounded text-[10px] font-bold uppercase tracking-wider text-black">
+                        Livello: {selectedWorker.level}{selectedWorker.isSuper ? ' Super' : ''}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1266,19 +1572,61 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                   </div>
                   <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
                     <span className="text-zinc-500">Retribuzione oraria</span>
-                    <span className="font-mono font-medium">{selectedPayroll.hourlyRate.toFixed(2)} €/h</span>
+                    <span className="font-mono font-medium">{(selectedPayroll.hourlyRate || 0).toFixed(2)} €/h</span>
                   </div>
                   <div className="flex justify-between py-4 border-b border-zinc-100 text-base font-bold">
-                    <span>Totale Lordo</span>
-                    <span className="font-mono">{selectedPayroll.grossPay.toFixed(2)} €</span>
+                    <span>Totale</span>
+                    <span className="font-mono">{(selectedPayroll.grossPay || 0).toFixed(2)} €</span>
                   </div>
-                  <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
-                    <span className="text-zinc-500">Rateo Tredicesima</span>
-                    <span className="font-mono font-medium">{selectedPayroll.thirteenth.toFixed(2)} €</span>
+                  {selectedPayroll.includeWorkerContributionsInPayslip && (
+                    <div className="flex justify-between py-3 border-b border-zinc-50 text-sm italic text-zinc-600">
+                      <span>Quota contributi spettante al lavoratore</span>
+                      <span className="font-mono">-{(selectedPayroll.workerContributions || 0).toFixed(2)} €</span>
+                    </div>
+                  )}
+                  {selectedPayroll.includeWorkerContributionsInPayslip && (
+                    <div className="flex justify-between py-4 border-b border-zinc-100 text-lg font-black">
+                      <span>Netto a Pagare</span>
+                      <span className="font-mono">{( (selectedPayroll.grossPay || 0) - (selectedPayroll.workerContributions || 0) ).toFixed(2)} €</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mb-12 grid grid-cols-2 gap-6">
+                  <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
+                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-4">Contributi INPS (€)</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-zinc-500">Quota Datore</span>
+                        <span className="font-mono font-medium">{(selectedPayroll.employerContributions || 0).toFixed(2)} €</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-zinc-500">Quota Lavoratore</span>
+                        <span className="font-mono font-medium">{(selectedPayroll.workerContributions || 0).toFixed(2)} €</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t border-zinc-200 text-sm font-bold">
+                        <span>Totale da Versare</span>
+                        <span className="font-mono">{(selectedPayroll.totalContributions || 0).toFixed(2)} €</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between py-3 text-sm italic text-zinc-400">
-                    <span>Accantonamento TFR (pro-quota)</span>
-                    <span className="font-mono">{selectedPayroll.tfr.toFixed(2)} €</span>
+
+                  <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
+                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-4">Riepilogo Ferie (h)</h4>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <p className="text-[8px] text-zinc-400 uppercase mb-1">Maturate</p>
+                        <p className="text-sm font-mono font-bold">{(selectedPayroll.holidayAccrued || 0).toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-zinc-400 uppercase mb-1">Godute</p>
+                        <p className="text-sm font-mono font-bold text-red-500">{(selectedPayroll.holidayTaken || 0).toFixed(1)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-zinc-400 uppercase mb-1">Residuo</p>
+                        <p className="text-sm font-mono font-bold text-green-600">{(selectedPayroll.holidayBalance || 0).toFixed(2)}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1562,7 +1910,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
 
                     <div className="space-y-6 text-sm leading-relaxed mb-12 text-zinc-700">
                       <p>Il sottoscritto <strong>{selectedWorker.employerName} {selectedWorker.employerSurname}</strong> (CF: {selectedWorker.employerCf}), in qualità di datore di lavoro,</p>
-                      <p>CERTIFICA che il lavoratore <strong>{selectedWorker.name} {selectedWorker.surname}</strong> (CF: {selectedWorker.cf}), rapporto nr. {selectedWorker.relationshipNumber}, ha percepito nell'anno {selectedYear} le seguenti somme:</p>
+                      <p>CERTIFICA che il lavoratore <strong>{selectedWorker.name} {selectedWorker.surname}</strong> (CF: {selectedWorker.cf}), rapporto nr. {selectedWorker.relationshipNumber}, livello <strong>{selectedWorker.level}{selectedWorker.isSuper ? ' Super' : ''}</strong>, ha percepito nell'anno {selectedYear} le seguenti somme:</p>
                     </div>
 
                     <div className="border border-zinc-100 rounded-3xl overflow-hidden mb-12">
