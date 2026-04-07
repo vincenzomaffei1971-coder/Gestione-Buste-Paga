@@ -54,7 +54,7 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import logo from '/logo.png';
+import logo from './logo.png';
 
 // Import refactored components
 import { Sidebar } from './components/Dashboard/Sidebar';
@@ -388,27 +388,18 @@ const NotAuthorized = ({ onSignOut }: { onSignOut: () => void }) => (
   </div>
 );
 
-const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
+const Dashboard = ({ 
+  user, 
+  profile, 
+  deferredPrompt, 
+  handleInstall 
+}: { 
+  user: User, 
+  profile: UserProfile, 
+  deferredPrompt: any, 
+  handleInstall: () => void 
+}) => {
   const [isTestMode, setIsTestMode] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-
-  useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-    }
-  };
 
   const actualIsAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
   const isAdmin = actualIsAdmin && !isTestMode;
@@ -1086,6 +1077,25 @@ function AppContent() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPreApproved, setIsPreApproved] = useState<boolean | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   useEffect(() => {
     const autoCreateProfile = async () => {
@@ -1193,5 +1203,10 @@ function AppContent() {
     return <WaitingForApproval onSignOut={() => signOut(auth)} />;
   }
 
-  return <Dashboard user={user} profile={profile} />;
+  return <Dashboard 
+    user={user} 
+    profile={profile} 
+    deferredPrompt={deferredPrompt}
+    handleInstall={handleInstall}
+  />;
 }

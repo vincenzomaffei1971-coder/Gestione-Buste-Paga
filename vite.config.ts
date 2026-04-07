@@ -16,6 +16,13 @@ export default defineConfig(({mode}) => {
       VitePWA({
         registerType: 'autoUpdate',
         injectRegister: 'auto',
+        manifestFilename: 'manifest.json',
+        filename: 'sw.js',
+        includeAssets: ['logo.png'],
+        devOptions: {
+          enabled: true,
+          type: 'module',
+        },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
           cleanupOutdatedCaches: true,
@@ -29,28 +36,29 @@ export default defineConfig(({mode}) => {
           theme_color: '#000000',
           background_color: '#f5f5f5',
           display: 'standalone',
-          start_url: base,
+          start_url: '.',
+          scope: '.',
           icons: [
             {
-              src: `${base}logo.png`,
+              src: 'logo.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: `${base}logo.png`,
+              src: 'logo.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: `${base}logo.png`,
+              src: 'logo.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'maskable'
             },
             {
-              src: `${base}logo.png`,
+              src: 'logo.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'
