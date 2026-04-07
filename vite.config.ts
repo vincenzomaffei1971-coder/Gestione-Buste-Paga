@@ -15,6 +15,13 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: 'auto',
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+        },
         manifest: {
           name: 'Gestionale Busta Paga Colf',
           short_name: 'BustaPagaColf',
@@ -22,18 +29,31 @@ export default defineConfig(({mode}) => {
           theme_color: '#000000',
           background_color: '#f5f5f5',
           display: 'standalone',
+          start_url: base,
           icons: [
             {
               src: `${base}logo.png`,
               sizes: '192x192',
               type: 'image/png',
-              purpose: 'any maskable'
+              purpose: 'any'
             },
             {
               src: `${base}logo.png`,
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any maskable'
+              purpose: 'any'
+            },
+            {
+              src: `${base}logo.png`,
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'maskable'
+            },
+            {
+              src: `${base}logo.png`,
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable'
             }
           ]
         }
