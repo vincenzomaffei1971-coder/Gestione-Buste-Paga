@@ -54,7 +54,7 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import logo from '/logo.png';
+const logo = `${import.meta.env.BASE_URL}logo.png`;
 
 // --- HELPERS ---
 
