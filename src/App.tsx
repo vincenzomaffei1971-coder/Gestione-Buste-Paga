@@ -282,7 +282,7 @@ const Login = () => {
                     Controlla lo stato di Firebase
                   </a>
                   <p className="mt-2 text-[10px] text-red-500">
-                    Se il problema persiste, assicurati che il dominio sia autorizzato nella console Firebase (Authentication > Settings > Authorized domains).
+                    Se il problema persiste, assicurati che il dominio sia autorizzato nella console Firebase (Authentication &gt; Settings &gt; Authorized domains).
                   </p>
                 </div>
               )}
