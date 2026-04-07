@@ -224,7 +224,7 @@ const Login = () => {
       >
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-6">
-            <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           </div>
           <h1 className="text-3xl font-light tracking-tight mb-2">Gestionale Busta Paga</h1>
           <p className="text-zinc-500">Accedi con il tuo account Google</p>
@@ -768,7 +768,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
         <div className="p-6">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <span className="font-medium tracking-tight">Busta Paga Colf</span>
           </div>
@@ -1536,7 +1536,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
                 <div className="flex justify-between items-start mb-12">
                   <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
-                    <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                   </div>
                   <div className="text-right">
                     <h2 className="text-2xl font-bold uppercase tracking-tighter">Prospetto Paga</h2>
@@ -1870,7 +1870,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                   <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
                     <div className="flex justify-between items-start mb-12">
                       <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
-                        <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                       </div>
                       <div className="text-right">
                         <h2 className="text-2xl font-bold uppercase tracking-tighter">Certificazione Unica</h2>
