@@ -168,6 +168,15 @@ service cloud.firestore {
       allow write: if isApproved();
     }
 
+    match /thirteenth_yearly/{thirteenthId} {
+      allow read: if isApproved();
+      allow write: if isApproved();
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

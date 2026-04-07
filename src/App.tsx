@@ -46,6 +46,7 @@ import {
   Worker, 
   PayrollEntry, 
   TfrYearlyData,
+  ThirteenthYearlyData,
   HolidayYearlyData,
   MONTHS, 
   YEARS, 
@@ -53,6 +54,7 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
+import logo from '/logo.png';
 
 // --- HELPERS ---
 
@@ -165,9 +167,11 @@ class ErrorBoundary extends React.Component<any, any> {
 async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
+    console.log("Firebase connection successful.");
   } catch (error) {
+    console.error("Firebase connection test failed:", error);
     if(error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration. ");
+      console.error("Please check your Firebase configuration. This error usually means the client cannot reach the Firestore backend.");
     }
   }
 }
@@ -224,7 +228,7 @@ const Login = () => {
       >
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-6">
-            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+            <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           </div>
           <h1 className="text-3xl font-light tracking-tight mb-2">Gestionale Busta Paga</h1>
           <p className="text-zinc-500">Accedi con il tuo account Google</p>
@@ -345,8 +349,9 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [payroll, setPayroll] = useState<PayrollEntry[]>([]);
   const [tfrYearlyData, setTfrYearlyData] = useState<TfrYearlyData[]>([]);
+  const [thirteenthYearlyData, setThirteenthYearlyData] = useState<ThirteenthYearlyData[]>([]);
   const [holidayYearlyData, setHolidayYearlyData] = useState<HolidayYearlyData[]>([]);
-  const [view, setView] = useState<'list' | 'worker' | 'add-worker' | 'print-cu' | 'print-payslip' | 'admin-users' | 'admin-add' | 'admin-preapproved'>('list');
+  const [view, setView] = useState<'list' | 'worker' | 'add-worker' | 'print-cu' | 'print-payslip' | 'print-thirteenth' | 'admin-users' | 'admin-add' | 'admin-preapproved'>('list');
   const [loading, setLoading] = useState(true);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollEntry | null>(null);
   const [selectedYear, setSelectedYear] = useState(2026);
@@ -445,6 +450,17 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
       setHolidayYearlyData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as HolidayYearlyData)));
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'holiday_yearly');
+    });
+    return () => unsubscribe();
+  }, [selectedWorker]);
+
+  useEffect(() => {
+    if (!selectedWorker) return;
+    const q = query(collection(db, 'thirteenth_yearly'), where('workerId', '==', selectedWorker.id));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setThirteenthYearlyData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ThirteenthYearlyData)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'thirteenth_yearly');
     });
     return () => unsubscribe();
   }, [selectedWorker]);
@@ -627,6 +643,21 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
     }
   };
 
+  const updateThirteenthYearly = async (year: number, amount: number, isPaid: boolean) => {
+    if (!selectedWorker) return;
+    const id = `${selectedWorker.id}_${year}`;
+    try {
+      await setDoc(doc(db, 'thirteenth_yearly', id), {
+        workerId: selectedWorker.id,
+        year,
+        amount,
+        isPaid
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `thirteenth_yearly/${id}`);
+    }
+  };
+
   const updateWorkerLevel = async (level: 'A' | 'B' | 'C' | 'D', isSuper: boolean) => {
     if (!selectedWorker) return;
     const safeLevel = level || 'A';
@@ -768,7 +799,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
         <div className="p-6">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+              <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <span className="font-medium tracking-tight">Busta Paga Colf</span>
           </div>
@@ -1485,35 +1516,78 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                     </div>
 
                     <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                          <TrendingUp className="text-amber-500 w-5 h-5" />
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                            <TrendingUp className="text-amber-500 w-5 h-5" />
+                          </div>
+                          <h3 className="text-lg font-medium">Calcolo Tredicesima</h3>
                         </div>
-                        <h3 className="text-lg font-medium">Calcolo Tredicesima</h3>
+                        <select 
+                          value={selectedYear}
+                          onChange={e => setSelectedYear(parseInt(e.target.value) || 2026)}
+                          className="bg-zinc-50 border-none rounded-xl px-3 py-2 text-xs outline-none"
+                        >
+                          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
                       </div>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-end pb-4 border-b border-zinc-50">
-                          <span className="text-sm text-zinc-500">Accantonato {selectedYear}</span>
-                          <span className="font-mono font-medium">
-                            {payroll.filter(p => p.year === selectedYear).reduce((acc, p) => acc + p.thirteenth, 0).toFixed(2)} €
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-end pb-4 border-b border-zinc-50">
-                          <span className="text-sm text-zinc-500">Già Pagata</span>
-                          <span className="font-mono font-medium text-green-600">
-                            {payroll.filter(p => p.year === selectedYear && p.isThirteenthPayment).reduce((acc, p) => acc + p.grossPay, 0).toFixed(2)} €
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-end pt-2">
-                          <span className="text-base font-bold">Saldo da Pagare</span>
-                          <span className="text-xl font-mono font-bold text-amber-600">
-                            {(payroll.filter(p => p.year === selectedYear).reduce((acc, p) => acc + p.thirteenth, 0) - 
-                              payroll.filter(p => p.year === selectedYear && p.isThirteenthPayment).reduce((acc, p) => acc + p.grossPay, 0)).toFixed(2)} €
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-zinc-400 mt-4 italic">
-                          * Il calcolo si basa sui ratei mensili maturati (Lordo / 12).
-                        </p>
+                      
+                      <div className="space-y-6">
+                        {(() => {
+                          const yearAccrued = payroll.filter(p => p.year === selectedYear).reduce((acc, p) => acc + p.thirteenth, 0);
+                          const yearPaidInPayroll = payroll.filter(p => p.year === selectedYear && p.isThirteenthPayment).reduce((acc, p) => acc + p.grossPay, 0);
+                          const thirteenthData = thirteenthYearlyData.find(d => d.year === selectedYear);
+                          const isSaldato = thirteenthData?.isPaid || false;
+                          const saldoDaPagare = yearAccrued - yearPaidInPayroll;
+
+                          return (
+                            <>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 bg-zinc-50 rounded-2xl">
+                                  <span className="text-[10px] uppercase tracking-widest text-zinc-400 block mb-1">Accantonato {selectedYear}</span>
+                                  <span className="text-lg font-mono font-bold">{yearAccrued.toFixed(2)} €</span>
+                                </div>
+                                <div className="p-4 bg-zinc-50 rounded-2xl">
+                                  <span className="text-[10px] uppercase tracking-widest text-zinc-400 block mb-1">Pagata in Busta</span>
+                                  <span className="text-lg font-mono font-bold text-green-600">{yearPaidInPayroll.toFixed(2)} €</span>
+                                </div>
+                              </div>
+
+                              <div className="p-6 border-2 border-dashed border-zinc-100 rounded-2xl">
+                                <div className="flex justify-between items-center mb-4">
+                                  <div>
+                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 block mb-1">Saldo da Pagare</span>
+                                    <span className={`text-2xl font-mono font-bold ${saldoDaPagare > 0 ? 'text-amber-600' : 'text-zinc-300'}`}>
+                                      {saldoDaPagare.toFixed(2)} €
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <button 
+                                      onClick={() => updateThirteenthYearly(selectedYear, yearAccrued, !isSaldato)}
+                                      className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors ${
+                                        isSaldato 
+                                          ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                                          : 'bg-black text-white hover:bg-zinc-800'
+                                      }`}
+                                    >
+                                      {isSaldato ? 'Saldato' : 'Segna come Saldato'}
+                                    </button>
+                                    <button 
+                                      onClick={() => setView('print-thirteenth')}
+                                      className="px-4 py-2 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                      <Printer className="w-3 h-3" />
+                                      Stampa Cedolino
+                                    </button>
+                                  </div>
+                                </div>
+                                <p className="text-[10px] text-zinc-400 italic">
+                                  * Il calcolo si basa sui ratei mensili maturati (Lordo / 12).
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1536,7 +1610,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
                 <div className="flex justify-between items-start mb-12">
                   <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
-                    <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                    <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                   </div>
                   <div className="text-right">
                     <h2 className="text-2xl font-bold uppercase tracking-tighter">Prospetto Paga</h2>
@@ -1619,6 +1693,95 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                 >
                   <Printer className="w-5 h-5" />
                   Stampa Busta Paga
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {view === 'print-thirteenth' && selectedWorker && (
+            <motion.div 
+              key="print-thirteenth"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="max-w-3xl mx-auto"
+            >
+              <button onClick={() => setView('worker')} className="text-zinc-400 hover:text-black mb-6 flex items-center gap-2 text-sm print:hidden">
+                ← Torna al lavoratore
+              </button>
+              
+              <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
+                <div className="flex justify-between items-start mb-12">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
+                    <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="text-right">
+                    <h2 className="text-2xl font-bold uppercase tracking-tighter">Prospetto Tredicesima</h2>
+                    <p className="text-sm text-zinc-500">Anno: {selectedYear}</p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-12 mb-12 border-y border-zinc-100 py-8 print:border-zinc-200">
+                  <div>
+                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-3">Datore di Lavoro</h4>
+                    <p className="text-lg font-bold leading-tight">{selectedWorker.employerName} {selectedWorker.employerSurname}</p>
+                    <p className="text-sm font-mono text-zinc-500 mt-1">{selectedWorker.employerCf}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-3">Lavoratore</h4>
+                    <p className="text-lg font-bold leading-tight">{selectedWorker.name} {selectedWorker.surname}</p>
+                    <p className="text-sm font-mono text-zinc-500 mt-1">{selectedWorker.cf}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="px-2 py-1 bg-zinc-50 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-500 border border-zinc-100">
+                        Nr Rapporto: {selectedWorker.relationshipNumber}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 mb-12">
+                  {(() => {
+                    const yearAccrued = payroll.filter(p => p.year === selectedYear).reduce((acc, p) => acc + p.thirteenth, 0);
+                    const yearPaidInPayroll = payroll.filter(p => p.year === selectedYear && p.isThirteenthPayment).reduce((acc, p) => acc + p.grossPay, 0);
+                    const saldoDaPagare = yearAccrued - yearPaidInPayroll;
+
+                    return (
+                      <>
+                        <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
+                          <span className="text-zinc-500">Tredicesima maturata nell'anno {selectedYear}</span>
+                          <span className="font-mono font-medium">{yearAccrued.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
+                          <span className="text-zinc-500">Acconti già corrisposti in busta paga</span>
+                          <span className="font-mono font-medium text-red-500">-{yearPaidInPayroll.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between py-4 border-b border-zinc-100 text-lg font-black">
+                          <span>Saldo Tredicesima da Corrispondere</span>
+                          <span className="font-mono">{saldoDaPagare.toFixed(2)} €</span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                <div className="grid grid-cols-2 gap-12 mt-24">
+                  <div className="space-y-8">
+                    <div className="text-[10px] uppercase tracking-widest text-zinc-400">Data e Luogo</div>
+                    <div className="border-b border-zinc-200 w-full h-8"></div>
+                  </div>
+                  <div className="space-y-8">
+                    <div className="text-[10px] uppercase tracking-widest text-zinc-400 text-center">Firma per ricevuta</div>
+                    <div className="border-b border-zinc-200 w-full h-8"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-8 flex justify-center print:hidden">
+                <button 
+                  onClick={() => window.print()}
+                  className="bg-black text-white px-8 py-4 rounded-xl font-medium flex items-center gap-2 hover:bg-zinc-800 transition-colors"
+                >
+                  <Printer className="w-5 h-5" />
+                  Stampa Cedolino Tredicesima
                 </button>
               </div>
             </motion.div>
@@ -1870,7 +2033,7 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                   <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
                     <div className="flex justify-between items-start mb-12">
                       <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
-                        <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                        <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                       </div>
                       <div className="text-right">
                         <h2 className="text-2xl font-bold uppercase tracking-tighter">Certificazione Unica</h2>

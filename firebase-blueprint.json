@@ -45,6 +45,18 @@
         "tfr": { "type": "number" }
       },
       "required": ["id", "workerId", "managerId", "year", "month", "hourlyRate", "hoursWorked", "grossPay", "thirteenth", "tfr"]
+    },
+    "ThirteenthYearly": {
+      "title": "Thirteenth Yearly Data",
+      "description": "Yearly summary of 13th-month pay status.",
+      "type": "object",
+      "properties": {
+        "workerId": { "type": "string" },
+        "year": { "type": "integer" },
+        "amount": { "type": "number" },
+        "isPaid": { "type": "boolean" }
+      },
+      "required": ["workerId", "year", "amount", "isPaid"]
     }
   },
   "firestore": {
@@ -59,6 +71,10 @@
     "/payroll/{payrollId}": {
       "schema": "Payroll",
       "description": "Monthly payroll entries."
+    },
+    "/thirteenth_yearly/{id}": {
+      "schema": "ThirteenthYearly",
+      "description": "Yearly 13th-month pay status."
     }
   }
 }

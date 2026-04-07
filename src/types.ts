@@ -63,6 +63,14 @@ export interface HolidayYearlyData {
   balance: number;
 }
 
+export interface ThirteenthYearlyData {
+  id: string;
+  workerId: string;
+  year: number;
+  amount: number;
+  isPaid: boolean;
+}
+
 export const MONTHS = [
   "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
   "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"
