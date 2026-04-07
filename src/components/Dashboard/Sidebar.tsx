@@ -5,7 +5,8 @@ import {
   UserPlus, 
   History, 
   LogOut, 
-  User as UserIcon 
+  User as UserIcon,
+  Download
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { UserProfile } from '../../types';
@@ -21,6 +22,8 @@ interface SidebarProps {
   setIsTestMode: (mode: boolean) => void;
   onSignOut: () => void;
   logo: string;
+  canInstall?: boolean;
+  onInstall?: () => void;
 }
 
 export const Sidebar = React.memo(({ 
@@ -33,7 +36,9 @@ export const Sidebar = React.memo(({
   isTestMode, 
   setIsTestMode, 
   onSignOut,
-  logo
+  logo,
+  canInstall,
+  onInstall
 }: SidebarProps) => {
   return (
     <aside className="w-64 bg-white border-r border-zinc-100 flex flex-col print:hidden">
@@ -49,6 +54,15 @@ export const Sidebar = React.memo(({
         </button>
 
         <nav className="space-y-1">
+          {canInstall && onInstall && (
+            <button 
+              onClick={onInstall}
+              className="w-full flex items-center gap-3 px-4 py-3 mb-2 rounded-xl text-sm bg-black text-white hover:bg-zinc-800 transition-colors shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              Installa App
+            </button>
+          )}
           <button 
             onClick={() => { setView('list'); setSelectedWorker(null); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'list' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}

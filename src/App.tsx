@@ -390,6 +390,26 @@ const NotAuthorized = ({ onSignOut }: { onSignOut: () => void }) => (
 
 const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   const [isTestMode, setIsTestMode] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
   const actualIsAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
   const isAdmin = actualIsAdmin && !isTestMode;
 
@@ -854,6 +874,8 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
         setIsTestMode={setIsTestMode}
         onSignOut={() => signOut(auth)}
         logo={logo}
+        canInstall={!!deferredPrompt}
+        onInstall={handleInstall}
       />
 
       {/* Main Content */}
