@@ -6,10 +6,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const base = process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/';
+  
   return {
-    // Se l'app viene ospitata su GitLab Pages (es. username.gitlab.io/project-name/),
-    // decommenta la riga sotto e inserisci il nome del progetto:
-    base: process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/',
+    base,
     plugins: [
       react(), 
       tailwindcss(),
@@ -24,13 +24,13 @@ export default defineConfig(({mode}) => {
           display: 'standalone',
           icons: [
             {
-              src: 'logo.png',
+              src: `${base}logo.png`,
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any maskable'
             },
             {
-              src: 'logo.png',
+              src: `${base}logo.png`,
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any maskable'
