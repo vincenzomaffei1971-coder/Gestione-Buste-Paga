@@ -56,6 +56,18 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import logo from '/logo.png';
 
+// Import refactored components
+import { Sidebar } from './components/Dashboard/Sidebar';
+import { WorkerList } from './components/Dashboard/WorkerList';
+import { AddWorkerForm } from './components/Dashboard/AddWorkerForm';
+import { AdminUsers } from './components/Dashboard/AdminUsers';
+import { AdminAddUser } from './components/Dashboard/AdminAddUser';
+import { AdminPreapproved } from './components/Dashboard/AdminPreapproved';
+import { WorkerDetail } from './components/Dashboard/WorkerDetail';
+import { PrintPayslip } from './components/Dashboard/PrintPayslip';
+import { PrintCU } from './components/Dashboard/PrintCU';
+import { PrintThirteenth } from './components/Dashboard/PrintThirteenth';
+
 // --- HELPERS ---
 
 enum OperationType {
@@ -831,96 +843,18 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
   return (
     <div className="min-h-screen bg-[#f5f5f5] flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-zinc-100 flex flex-col print:hidden">
-        <div className="p-6">
-          <button 
-            onClick={() => { setView('list'); setSelectedWorker(null); }}
-            className="flex items-center gap-3 mb-8 hover:opacity-80 transition-opacity group"
-          >
-            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
-              <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-            </div>
-            <span className="font-medium tracking-tight group-hover:text-zinc-600 transition-colors">Busta Paga Colf</span>
-          </button>
-
-          <nav className="space-y-1">
-            <button 
-              onClick={() => { setView('list'); setSelectedWorker(null); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'list' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
-            >
-              <Users className="w-4 h-4" />
-              Lavoratori
-            </button>
-            {(profile.role === 'user' || actualIsAdmin) && (
-              <button 
-                onClick={() => { setView('add-worker')} }
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'add-worker' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
-              >
-                <Plus className="w-4 h-4" />
-                Nuovo Lavoratore
-              </button>
-            )}
-            {isAdmin && (
-              <>
-                <button 
-                  onClick={() => setView('admin-users')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'admin-users' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
-                >
-                  <Users className="w-4 h-4" />
-                  Utenti Profilati
-                </button>
-                <button 
-                  onClick={() => setView('admin-add')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'admin-add' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Aggiungi Utente
-                </button>
-                <button 
-                  onClick={() => setView('admin-preapproved')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${view === 'admin-preapproved' ? 'bg-zinc-100 text-black font-medium' : 'text-zinc-500 hover:bg-zinc-50'}`}
-                >
-                  <History className="w-4 h-4" />
-                  Pre-autorizzati
-                </button>
-              </>
-            )}
-          </nav>
-        </div>
-
-        <div className="mt-auto p-6 border-t border-zinc-100">
-          {actualIsAdmin && (
-            <button
-              onClick={() => {
-                setIsTestMode(!isTestMode);
-                if (!isTestMode && (view === 'admin-users' || view === 'admin-add')) {
-                  setView('list');
-                }
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-2 mb-4 rounded-xl text-xs transition-colors ${isTestMode ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'text-zinc-500 hover:bg-zinc-50'}`}
-            >
-              <div className={`w-2 h-2 rounded-full ${isTestMode ? 'bg-amber-500' : 'bg-zinc-300'}`} />
-              {isTestMode ? 'Esci da Modalità Test' : 'Modalità Test (Vista Utente)'}
-            </button>
-          )}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center">
-              <UserIcon className="w-4 h-4 text-zinc-500" />
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-medium truncate">{profile.name} {profile.surname}</p>
-              <p className="text-[10px] text-zinc-400 truncate">{profile.cf}</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => signOut(auth)}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-xs text-red-500 hover:bg-red-50 transition-colors"
-          >
-            <LogOut className="w-3 h-3" />
-            Esci
-          </button>
-        </div>
-      </aside>
+      <Sidebar 
+        view={view}
+        setView={setView}
+        setSelectedWorker={setSelectedWorker}
+        profile={profile}
+        isAdmin={isAdmin}
+        actualIsAdmin={actualIsAdmin}
+        isTestMode={isTestMode}
+        setIsTestMode={setIsTestMode}
+        onSignOut={() => signOut(auth)}
+        logo={logo}
+      />
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto p-8 print:p-0 print:bg-white">
@@ -939,59 +873,12 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                 </div>
               </header>
 
-              {loading ? (
-                <div className="flex items-center justify-center py-20">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
-                </div>
-              ) : workers.length === 0 ? (
-                <div className="bg-white rounded-3xl p-12 text-center border border-zinc-100">
-                  <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Users className="text-zinc-300 w-8 h-8" />
-                  </div>
-                  <h3 className="text-lg font-medium mb-2">Nessun lavoratore trovato</h3>
-                  <p className="text-zinc-400 mb-6">Inizia aggiungendo il tuo primo lavoratore.</p>
-                  <button 
-                    onClick={() => setView('add-worker')}
-                    className="bg-black text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors"
-                  >
-                    Aggiungi Lavoratore
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {workers.map(worker => (
-                    <motion.div 
-                      key={worker.id}
-                      whileHover={{ y: -4 }}
-                      className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 cursor-pointer group"
-                      onClick={() => { setSelectedWorker(worker); setView('worker'); }}
-                    >
-                      <div className="flex justify-between items-start mb-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-zinc-50 rounded-2xl flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors shrink-0">
-                            <UserIcon className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-medium tracking-tight text-zinc-900 leading-tight">{worker.title}</h3>
-                            <p className="text-xs text-zinc-500">{worker.name} {worker.surname}</p>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-zinc-300 group-hover:text-black transition-colors" />
-                      </div>
-                      <div className="flex items-center justify-between pt-4 border-t border-zinc-50">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] uppercase tracking-widest text-zinc-400">Codice Fiscale</span>
-                          <span className="text-xs font-mono">{worker.cf}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-[10px] uppercase tracking-widest text-zinc-400">Nr Rapporto</span>
-                          <span className="text-sm font-mono">{worker.relationshipNumber}</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
+              <WorkerList 
+                workers={workers}
+                loading={loading}
+                setView={setView}
+                setSelectedWorker={setSelectedWorker}
+              />
             </motion.div>
           )}
 
@@ -1001,152 +888,14 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="max-w-2xl"
             >
-              <button onClick={() => setView('list')} className="text-zinc-400 hover:text-black mb-6 flex items-center gap-2 text-sm">
-                ← Torna alla lista
-              </button>
-              <h1 className="text-4xl font-light tracking-tight mb-8">Nuovo Lavoratore</h1>
-              
-              <form onSubmit={handleAddWorker} className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100 space-y-6">
-                {formError && (
-                  <div className="bg-red-50 text-red-500 p-4 rounded-xl text-sm">
-                    {formError}
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Titolo Rapporto (es. Colf, Badante, Giardiniere)</label>
-                  <input 
-                    required
-                    value={newWorker.title}
-                    onChange={e => setNewWorker({...newWorker, title: e.target.value})}
-                    className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
-                    placeholder="Es. Colf Part-time"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Nome Lavoratore</label>
-                    <input 
-                      required
-                      value={newWorker.name}
-                      onChange={e => setNewWorker({...newWorker, name: e.target.value})}
-                      className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Cognome Lavoratore</label>
-                    <input 
-                      required
-                      value={newWorker.surname}
-                      onChange={e => setNewWorker({...newWorker, surname: e.target.value})}
-                      className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Codice Fiscale Lavoratore</label>
-                  <input 
-                    required
-                    maxLength={16}
-                    value={newWorker.cf}
-                    onChange={e => setNewWorker({...newWorker, cf: e.target.value})}
-                    className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none uppercase"
-                    placeholder="RSSMRA80A01H501Z"
-                  />
-                </div>
-
-                <div className="pt-6 border-t border-zinc-100">
-                  <h3 className="text-sm font-medium mb-4">Dati Datore di Lavoro</h3>
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Nome Datore</label>
-                      <input 
-                        required
-                        value={newWorker.employerName}
-                        onChange={e => setNewWorker({...newWorker, employerName: e.target.value})}
-                        className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Cognome Datore</label>
-                      <input 
-                        required
-                        value={newWorker.employerSurname}
-                        onChange={e => setNewWorker({...newWorker, employerSurname: e.target.value})}
-                        className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Codice Fiscale Datore</label>
-                    <input 
-                      required
-                      maxLength={16}
-                      value={newWorker.employerCf}
-                      onChange={e => setNewWorker({...newWorker, employerCf: e.target.value})}
-                      className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none uppercase"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Livello</label>
-                    <select 
-                      required
-                      value={newWorker.level}
-                      onChange={e => setNewWorker({...newWorker, level: e.target.value as any})}
-                      className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
-                    >
-                      <option value="A">A</option>
-                      <option value="B">B</option>
-                      <option value="C">C</option>
-                      <option value="D">D</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Ore Settimanali (Contratto)</label>
-                    <input 
-                      required
-                      type="number"
-                      value={newWorker.contractHoursPerWeek}
-                      onChange={e => setNewWorker({...newWorker, contractHoursPerWeek: parseFloat(e.target.value) || 0})}
-                      className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-end pb-4">
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                      <div className="relative">
-                        <input 
-                          type="checkbox"
-                          checked={newWorker.isSuper}
-                          onChange={e => setNewWorker({...newWorker, isSuper: e.target.checked})}
-                          className="sr-only"
-                        />
-                        <div className={`w-10 h-6 rounded-full transition-colors ${newWorker.isSuper ? 'bg-black' : 'bg-zinc-200'}`} />
-                        <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${newWorker.isSuper ? 'translate-x-4' : ''}`} />
-                      </div>
-                      <span className="text-sm font-medium text-zinc-600 group-hover:text-black transition-colors">Opzione Super</span>
-                    </label>
-                  </div>
-
-                <div>
-                  <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-2">Nr Rapporto</label>
-                  <input 
-                    required
-                    value={newWorker.relationshipNumber}
-                    onChange={e => setNewWorker({...newWorker, relationshipNumber: e.target.value})}
-                    className="w-full bg-zinc-50 border-none rounded-xl p-4 focus:ring-2 focus:ring-black outline-none"
-                    placeholder="Es. 12345/2024"
-                  />
-                </div>
-                <button className="w-full bg-black text-white rounded-xl py-4 font-medium hover:bg-zinc-800 transition-colors">
-                  Salva Lavoratore
-                </button>
-              </form>
+              <AddWorkerForm 
+                profile={profile}
+                onAdd={handleAddWorker}
+                onCancel={() => setView('list')}
+                formError={formError}
+                setFormError={setFormError}
+              />
             </motion.div>
           )}
 
@@ -1157,481 +906,28 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <div className="flex justify-between items-start mb-8 print:hidden">
-                <div>
-                  <button onClick={() => setView('list')} className="text-zinc-400 hover:text-black mb-4 flex items-center gap-2 text-sm">
-                    ← Torna alla lista
-                  </button>
-                  <h1 className="text-4xl font-light tracking-tight">{selectedWorker.title}</h1>
-                  <p className="text-zinc-500 mt-1">{selectedWorker.name} {selectedWorker.surname} — Nr. Rapporto: {selectedWorker.relationshipNumber}</p>
-                  <div className="flex items-center gap-4 mt-4">
-                    <div className="flex items-center gap-2">
-                      <label className="text-[10px] uppercase tracking-widest text-zinc-400">Livello:</label>
-                      <select 
-                        value={selectedWorker.level || 'A'}
-                        onChange={(e) => updateWorkerLevel(e.target.value as any, selectedWorker.isSuper || false)}
-                        className="bg-zinc-100 border-none rounded-lg px-2 py-1 text-xs font-bold focus:ring-1 focus:ring-black outline-none"
-                      >
-                        <option value="A">A</option>
-                        <option value="B">B</option>
-                        <option value="C">C</option>
-                        <option value="D">D</option>
-                      </select>
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer group">
-                      <input 
-                        type="checkbox"
-                        checked={selectedWorker.isSuper || false}
-                        onChange={(e) => updateWorkerLevel(selectedWorker.level || 'A', e.target.checked)}
-                        className="rounded border-zinc-300 text-black focus:ring-black"
-                      />
-                      <span className="text-[10px] uppercase tracking-widest text-zinc-400 group-hover:text-black transition-colors">Super</span>
-                    </label>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {showDeleteConfirm === selectedWorker.id ? (
-                    <div className="flex items-center gap-2 bg-red-50 p-1 rounded-xl">
-                      <span className="text-[10px] text-red-500 font-medium px-2 uppercase tracking-widest">Confermi?</span>
-                      <button 
-                        onClick={() => deleteWorker(selectedWorker.id)}
-                        className="bg-red-500 text-white px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-colors"
-                      >
-                        Sì, elimina
-                      </button>
-                      <button 
-                        onClick={() => setShowDeleteConfirm(null)}
-                        className="bg-zinc-200 text-zinc-600 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-300 transition-colors"
-                      >
-                        No
-                      </button>
-                    </div>
-                  ) : (
-                    <button 
-                      onClick={() => setShowDeleteConfirm(selectedWorker.id)}
-                      className="text-red-400 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
-                {/* Payroll Entry Form */}
-                <div className="lg:col-span-1 space-y-6">
-                  {/* Contract Details Card */}
-                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-medium flex items-center gap-2">
-                        <Briefcase className="w-4 h-4 text-zinc-400" />
-                        Dati Contrattuali
-                      </h3>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Ore settimanali da contratto</label>
-                        <div className="flex gap-2">
-                          <input 
-                            type="number"
-                            value={selectedWorker.contractHoursPerWeek || 0}
-                            onChange={(e) => updateWorkerContract(parseFloat(e.target.value) || 0)}
-                            className="flex-1 bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
-                          />
-                          <div className="bg-zinc-100 px-4 flex items-center rounded-xl text-xs font-medium text-zinc-500">
-                            h/sett
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100 sticky top-8">
-                    <h3 className="text-lg font-medium mb-6 flex items-center gap-2">
-                      <Calculator className="w-5 h-5" />
-                      Nuovo Inserimento
-                    </h3>
-                    <form onSubmit={handleAddPayroll} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Anno</label>
-                          <select 
-                            value={newPayroll.year}
-                            onChange={e => setNewPayroll({...newPayroll, year: parseInt(e.target.value) || 2026})}
-                            className="w-full bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
-                          >
-                            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Mese</label>
-                          <select 
-                            value={newPayroll.month}
-                            onChange={e => setNewPayroll({...newPayroll, month: e.target.value})}
-                            className="w-full bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
-                          >
-                            {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Paga Oraria (€)</label>
-                        <input 
-                          type="number"
-                          step="0.01"
-                          value={newPayroll.hourlyRate}
-                          onChange={e => setNewPayroll({...newPayroll, hourlyRate: parseFloat(e.target.value) || 0})}
-                          className="w-full bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Ore Lavorate</label>
-                          <input 
-                            type="number"
-                            step="0.5"
-                            readOnly
-                            value={newPayroll.hoursWorked}
-                            className="w-full bg-zinc-100 border-none rounded-xl p-3 text-sm focus:ring-0 outline-none cursor-not-allowed"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Settimane Lav.</label>
-                          <select 
-                            value={newPayroll.weeksWorked}
-                            onChange={e => {
-                              const weeks = parseInt(e.target.value) || 0;
-                              const calculatedHours = weeks * (selectedWorker?.contractHoursPerWeek || 0);
-                              setNewPayroll({...newPayroll, weeksWorked: weeks, hoursWorked: calculatedHours});
-                            }}
-                            className="w-full bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
-                          >
-                            {[0, 1, 2, 3, 4, 5].map(w => <option key={w} value={w}>{w}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Ferie Godute (gg)</label>
-                        <input 
-                          type="number"
-                          step="0.5"
-                          value={newPayroll.holidayTaken}
-                          onChange={e => setNewPayroll({...newPayroll, holidayTaken: parseFloat(e.target.value) || 0})}
-                          className="w-full bg-zinc-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-black outline-none"
-                        />
-                      </div>
-                      
-                      <div className="flex flex-col gap-2 py-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input 
-                            type="checkbox"
-                            checked={newPayroll.isThirteenthPayment}
-                            onChange={e => setNewPayroll({...newPayroll, isThirteenthPayment: e.target.checked})}
-                            className="rounded border-zinc-300 text-black focus:ring-black"
-                          />
-                          <span className="text-xs text-zinc-600">Pagamento Tredicesima</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input 
-                            type="checkbox"
-                            checked={newPayroll.includeWorkerContributionsInPayslip}
-                            onChange={e => setNewPayroll({...newPayroll, includeWorkerContributionsInPayslip: e.target.checked})}
-                            className="rounded border-zinc-300 text-black focus:ring-black"
-                          />
-                          <span className="text-xs text-zinc-600">Quota contributi spettante al lavoratore</span>
-                        </label>
-                      </div>
-
-                      <button className="w-full bg-black text-white rounded-xl py-3 text-sm font-medium hover:bg-zinc-800 transition-colors">
-                        Salva nel Registro
-                      </button>
-                    </form>
-                  </div>
-                </div>
-
-                {/* History and Documents */}
-                <div className="lg:col-span-2 space-y-8">
-                  {/* Document Generation */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* CU Card */}
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
-                      <div className="w-10 h-10 bg-zinc-50 rounded-xl flex items-center justify-center mb-4">
-                        <FileText className="w-5 h-5 text-zinc-500" />
-                      </div>
-                      <h3 className="text-lg font-medium mb-2">Certificazione Unica</h3>
-                      <p className="text-sm text-zinc-400 mb-6">Genera la dichiarazione sostitutiva annuale.</p>
-                      <div className="flex gap-2">
-                        <select 
-                          value={selectedYear}
-                          onChange={e => setSelectedYear(parseInt(e.target.value) || 2026)}
-                          className="bg-zinc-50 border-none rounded-xl px-3 text-xs outline-none"
-                        >
-                          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
-                        <button 
-                          onClick={() => setView('print-cu')}
-                          className="flex-1 bg-black text-white rounded-xl py-3 text-xs font-medium flex items-center justify-center gap-2 hover:bg-zinc-800 transition-colors"
-                        >
-                          <Printer className="w-3 h-3" />
-                          Visualizza CU
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* TFR Summary Card */}
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-medium flex items-center gap-2">
-                          <History className="w-4 h-4 text-zinc-400" />
-                          Prospetto TFR Totale
-                        </h3>
-                        <span className="text-xs font-mono font-bold bg-zinc-100 px-2 py-1 rounded-lg">
-                          {payroll.reduce((acc, p) => acc + p.tfr, 0).toFixed(2)}€
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-zinc-400 leading-relaxed">
-                        Accantonamento totale maturato calcolato sulla base dei periodi inseriti.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* TFR Yearly Revaluation Section */}
-                  <div className="bg-white rounded-3xl shadow-sm border border-zinc-100 overflow-hidden">
-                    <div className="p-6 border-b border-zinc-50">
-                      <h3 className="text-lg font-medium flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5" />
-                        Rivalutazione TFR Annuale
-                      </h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
-                        <thead>
-                          <tr className="bg-zinc-50 text-[10px] uppercase tracking-widest text-zinc-400">
-                            <th className="px-6 py-4 font-medium">Anno</th>
-                            <th className="px-6 py-4 font-medium">TFR Maturato</th>
-                            <th className="px-6 py-4 font-medium">Tasso Riv. (%)</th>
-                            <th className="px-6 py-4 font-medium">TFR Rivalutato</th>
-                            <th className="px-6 py-4 font-medium">Saldato</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-50">
-                          {Array.from(new Set(payroll.map(p => p.year))).sort((a: number, b: number) => b - a).map((year: number) => {
-                            const yearlyTfr = payroll.filter(p => p.year === year).reduce((acc, p) => acc + p.tfr, 0);
-                            const tfrData = (tfrYearlyData.find(d => d.year === year) || { id: '', workerId: '', year, revaluationRate: 1.5, isPaid: false }) as TfrYearlyData;
-                            const revaluedTfr = yearlyTfr * (1 + (Number(tfrData.revaluationRate) || 0) / 100);
-                            
-                            return (
-                              <tr key={year} className="hover:bg-zinc-50 transition-colors">
-                                <td className="px-6 py-4 font-medium">{year}</td>
-                                <td className="px-6 py-4 font-mono">{yearlyTfr.toFixed(2)}€</td>
-                                <td className="px-6 py-4">
-                                  <input 
-                                    type="number"
-                                    step="0.1"
-                                    value={tfrData.revaluationRate}
-                                    onChange={(e) => updateTfrYearly(year, parseFloat(e.target.value) || 0, tfrData.isPaid)}
-                                    className="w-16 bg-zinc-50 border-none rounded-lg p-1 text-xs focus:ring-1 focus:ring-black outline-none font-mono"
-                                  />
-                                </td>
-                                <td className="px-6 py-4 font-mono font-bold text-black">{revaluedTfr.toFixed(2)}€</td>
-                                <td className="px-6 py-4">
-                                  <button 
-                                    onClick={() => updateTfrYearly(year, Number(tfrData.revaluationRate) || 0, !tfrData.isPaid)}
-                                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                                      tfrData.isPaid 
-                                        ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                                        : 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200'
-                                    }`}
-                                  >
-                                    {tfrData.isPaid ? 'Saldato' : 'Da Saldare'}
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                          {payroll.length === 0 && (
-                            <tr>
-                              <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">
-                                Nessun dato annuale disponibile.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* History Table */}
-                  <div className="bg-white rounded-3xl shadow-sm border border-zinc-100 overflow-hidden">
-                    <div className="p-6 border-b border-zinc-50 flex justify-between items-center">
-                      <h3 className="text-lg font-medium flex items-center gap-2">
-                        <History className="w-5 h-5" />
-                        Storico Pagamenti
-                      </h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
-                        <thead>
-                          <tr className="bg-zinc-50 text-[10px] uppercase tracking-widest text-zinc-400">
-                            <th className="px-6 py-4 font-medium">Periodo</th>
-                            <th className="px-6 py-4 font-medium">Ore</th>
-                            <th className="px-6 py-4 font-medium">Lordo</th>
-                            <th className="px-6 py-4 font-medium">13esima</th>
-                            <th className="px-6 py-4 font-medium">TFR</th>
-                            <th className="px-6 py-4 font-medium"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-50">
-                          {payroll.sort((a, b) => b.year - a.year || MONTHS.indexOf(b.month) - MONTHS.indexOf(a.month)).map(entry => (
-                            <tr key={entry.id} className="hover:bg-zinc-50 transition-colors">
-                              <td className="px-6 py-4 font-medium flex items-center gap-2">
-                                {entry.month} {entry.year}
-                                <button 
-                                  onClick={() => { setSelectedPayroll(entry); setView('print-payslip'); }}
-                                  className="p-1 hover:bg-zinc-200 rounded transition-colors"
-                                  title="Visualizza Busta Paga"
-                                >
-                                  <Printer className="w-3 h-3" />
-                                </button>
-                              </td>
-                              <td className="px-6 py-4 text-zinc-500 font-mono">{entry.hoursWorked}h</td>
-                              <td className="px-6 py-4 text-zinc-500 font-mono">{entry.grossPay}€</td>
-                              <td className="px-6 py-4 text-zinc-500 font-mono">{entry.thirteenth}€</td>
-                              <td className="px-6 py-4 text-zinc-500 font-mono">{entry.tfr}€</td>
-                              <td className="px-6 py-4 text-right">
-                                <button 
-                                  onClick={() => deletePayroll(entry.id)}
-                                  className="text-zinc-300 hover:text-red-500 transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                          {payroll.length === 0 && (
-                            <tr>
-                              <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">
-                                Nessun dato registrato.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Ferie and Tredicesima Summary */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                          <Calculator className="text-blue-500 w-5 h-5" />
-                        </div>
-                        <h3 className="text-lg font-medium">Calcolo Ferie</h3>
-                      </div>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-end pb-4 border-b border-zinc-50">
-                          <span className="text-sm text-zinc-500">Maturate {selectedYear}</span>
-                          <span className="font-mono font-medium">
-                            {(holidayYearlyData.find(h => h.year === selectedYear)?.accrued || 0).toFixed(2)} h
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-end pb-4 border-b border-zinc-50">
-                          <span className="text-sm text-zinc-500">Godute {selectedYear}</span>
-                          <span className="font-mono font-medium text-red-500">
-                            {(holidayYearlyData.find(h => h.year === selectedYear)?.taken || 0).toFixed(1)} h
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-end pt-2">
-                          <span className="text-base font-bold">Residuo {selectedYear}</span>
-                          <span className="text-xl font-mono font-bold text-green-600">
-                            {(holidayYearlyData.find(h => h.year === selectedYear)?.balance || 0).toFixed(2)} h
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-zinc-400 mt-4 italic">
-                          * Maturazione: (Ore settimanali * 4.333) / 12 al mese.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-                      <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                            <TrendingUp className="text-amber-500 w-5 h-5" />
-                          </div>
-                          <h3 className="text-lg font-medium">Calcolo Tredicesima</h3>
-                        </div>
-                        <select 
-                          value={selectedYear}
-                          onChange={e => setSelectedYear(parseInt(e.target.value) || 2026)}
-                          className="bg-zinc-50 border-none rounded-xl px-3 py-2 text-xs outline-none"
-                        >
-                          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
-                      </div>
-                      
-                      <div className="space-y-6">
-                        {(() => {
-                          const yearAccrued = payroll.filter(p => p.year === selectedYear).reduce((acc, p) => acc + p.thirteenth, 0);
-                          const yearPaidInPayroll = payroll.filter(p => p.year === selectedYear && p.isThirteenthPayment).reduce((acc, p) => acc + p.grossPay, 0);
-                          const thirteenthData = thirteenthYearlyData.find(d => d.year === selectedYear);
-                          const isSaldato = thirteenthData?.isPaid || false;
-                          const saldoDaPagare = yearAccrued - yearPaidInPayroll;
-
-                          return (
-                            <>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 bg-zinc-50 rounded-2xl">
-                                  <span className="text-[10px] uppercase tracking-widest text-zinc-400 block mb-1">Accantonato {selectedYear}</span>
-                                  <span className="text-lg font-mono font-bold">{yearAccrued.toFixed(2)} €</span>
-                                </div>
-                                <div className="p-4 bg-zinc-50 rounded-2xl">
-                                  <span className="text-[10px] uppercase tracking-widest text-zinc-400 block mb-1">Pagata in Busta</span>
-                                  <span className="text-lg font-mono font-bold text-green-600">{yearPaidInPayroll.toFixed(2)} €</span>
-                                </div>
-                              </div>
-
-                              <div className="p-6 border-2 border-dashed border-zinc-100 rounded-2xl">
-                                <div className="flex justify-between items-center mb-4">
-                                  <div>
-                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 block mb-1">Saldo da Pagare</span>
-                                    <span className={`text-2xl font-mono font-bold ${saldoDaPagare > 0 ? 'text-amber-600' : 'text-zinc-300'}`}>
-                                      {saldoDaPagare.toFixed(2)} €
-                                    </span>
-                                  </div>
-                                  <div className="flex flex-col gap-2">
-                                    <button 
-                                      onClick={() => updateThirteenthYearly(selectedYear, yearAccrued, !isSaldato)}
-                                      className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors ${
-                                        isSaldato 
-                                          ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                                          : 'bg-black text-white hover:bg-zinc-800'
-                                      }`}
-                                    >
-                                      {isSaldato ? 'Saldato' : 'Segna come Saldato'}
-                                    </button>
-                                    <button 
-                                      onClick={() => setView('print-thirteenth')}
-                                      className="px-4 py-2 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                      <Printer className="w-3 h-3" />
-                                      Stampa Cedolino
-                                    </button>
-                                  </div>
-                                </div>
-                                <p className="text-[10px] text-zinc-400 italic">
-                                  * Il calcolo si basa sui ratei mensili maturati (Lordo / 12).
-                                </p>
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <WorkerDetail 
+                selectedWorker={selectedWorker}
+                payroll={payroll}
+                tfrYearlyData={tfrYearlyData}
+                holidayYearlyData={holidayYearlyData}
+                thirteenthYearlyData={thirteenthYearlyData}
+                setView={setView}
+                setSelectedPayroll={setSelectedPayroll}
+                updateWorkerLevel={updateWorkerLevel}
+                updateWorkerContract={updateWorkerContract}
+                deleteWorker={deleteWorker}
+                deletePayroll={deletePayroll}
+                updateTfrYearly={updateTfrYearly}
+                updateThirteenthYearly={updateThirteenthYearly}
+                handleAddPayroll={handleAddPayroll}
+                showDeleteConfirm={showDeleteConfirm}
+                setShowDeleteConfirm={setShowDeleteConfirm}
+                selectedYear={selectedYear}
+                setSelectedYear={setSelectedYear}
+                newPayroll={newPayroll}
+                setNewPayroll={setNewPayroll}
+              />
             </motion.div>
           )}
 
@@ -1642,98 +938,13 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               animate={{ opacity: 1 }}
               className="max-w-3xl mx-auto"
             >
-              <button onClick={() => setView('worker')} className="text-zinc-400 hover:text-black mb-6 flex items-center gap-2 text-sm print:hidden">
-                ← Torna al lavoratore
-              </button>
-              
-              <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
-                <div className="flex justify-between items-start mb-12">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
-                    <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="text-right">
-                    <h2 className="text-2xl font-bold uppercase tracking-tighter">Prospetto Paga</h2>
-                    <p className="text-sm text-zinc-500">Periodo: {selectedPayroll.month} {selectedPayroll.year}</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-12 mb-12 border-y border-zinc-100 py-8 print:border-zinc-200">
-                  <div>
-                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-3">Datore di Lavoro</h4>
-                    <p className="text-lg font-bold leading-tight">{selectedWorker.employerName} {selectedWorker.employerSurname}</p>
-                    <p className="text-sm font-mono text-zinc-500 mt-1">{selectedWorker.employerCf}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-3">Lavoratore</h4>
-                    <p className="text-lg font-bold leading-tight">{selectedWorker.name} {selectedWorker.surname}</p>
-                    <p className="text-sm font-mono text-zinc-500 mt-1">{selectedWorker.cf}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <div className="px-2 py-1 bg-zinc-50 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-500 border border-zinc-100">
-                        Nr Rapporto: {selectedWorker.relationshipNumber}
-                      </div>
-                      <div className="px-2 py-1 bg-zinc-50 border border-zinc-200 rounded text-[10px] font-bold uppercase tracking-wider text-black">
-                        Livello: {selectedWorker.level}{selectedWorker.isSuper ? ' Super' : ''}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1 mb-12">
-                  <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
-                    <span className="text-zinc-500">Ore lavorate nel mese</span>
-                    <span className="font-mono font-medium">{selectedPayroll.hoursWorked} h</span>
-                  </div>
-                  <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
-                    <span className="text-zinc-500">Retribuzione oraria</span>
-                    <span className="font-mono font-medium">{(selectedPayroll.hourlyRate || 0).toFixed(2)} €/h</span>
-                  </div>
-                  <div className="flex justify-between py-4 border-b border-zinc-100 text-lg font-black">
-                    <span>Netto a Pagare</span>
-                    <span className="font-mono">{(selectedPayroll.grossPay || 0).toFixed(2)} €</span>
-                  </div>
-                </div>
-
-                <div className="mb-12 grid grid-cols-1 gap-6">
-                  <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
-                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-4">Riepilogo Ferie (h)</h4>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div>
-                        <p className="text-[8px] text-zinc-400 uppercase mb-1">Maturate</p>
-                        <p className="text-sm font-mono font-bold">{(selectedPayroll.holidayAccrued || 0).toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[8px] text-zinc-400 uppercase mb-1">Godute</p>
-                        <p className="text-sm font-mono font-bold text-red-500">{(selectedPayroll.holidayTaken || 0).toFixed(1)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[8px] text-zinc-400 uppercase mb-1">Residuo</p>
-                        <p className="text-sm font-mono font-bold text-green-600">{(selectedPayroll.holidayBalance || 0).toFixed(2)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-12 mt-24">
-                  <div className="space-y-8">
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-400">Data e Luogo</div>
-                    <div className="border-b border-zinc-200 w-full h-8"></div>
-                  </div>
-                  <div className="space-y-8">
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-400 text-center">Firma per ricevuta</div>
-                    <div className="border-b border-zinc-200 w-full h-8"></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-8 flex justify-center print:hidden">
-                <button 
-                  onClick={() => window.print()}
-                  className="bg-black text-white px-8 py-4 rounded-xl font-medium flex items-center gap-2 hover:bg-zinc-800 transition-colors"
-                >
-                  <Printer className="w-5 h-5" />
-                  Stampa Busta Paga
-                </button>
-              </div>
+              <PrintPayslip 
+                selectedWorker={selectedWorker}
+                selectedPayroll={selectedPayroll}
+                profile={profile}
+                setView={setView}
+                logo={logo}
+              />
             </motion.div>
           )}
 
@@ -1744,85 +955,14 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               animate={{ opacity: 1 }}
               className="max-w-3xl mx-auto"
             >
-              <button onClick={() => setView('worker')} className="text-zinc-400 hover:text-black mb-6 flex items-center gap-2 text-sm print:hidden">
-                ← Torna al lavoratore
-              </button>
-              
-              <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
-                <div className="flex justify-between items-start mb-12">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
-                    <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="text-right">
-                    <h2 className="text-2xl font-bold uppercase tracking-tighter">Prospetto Tredicesima</h2>
-                    <p className="text-sm text-zinc-500">Anno: {selectedYear}</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-12 mb-12 border-y border-zinc-100 py-8 print:border-zinc-200">
-                  <div>
-                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-3">Datore di Lavoro</h4>
-                    <p className="text-lg font-bold leading-tight">{selectedWorker.employerName} {selectedWorker.employerSurname}</p>
-                    <p className="text-sm font-mono text-zinc-500 mt-1">{selectedWorker.employerCf}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-3">Lavoratore</h4>
-                    <p className="text-lg font-bold leading-tight">{selectedWorker.name} {selectedWorker.surname}</p>
-                    <p className="text-sm font-mono text-zinc-500 mt-1">{selectedWorker.cf}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <div className="px-2 py-1 bg-zinc-50 rounded text-[10px] font-medium uppercase tracking-wider text-zinc-500 border border-zinc-100">
-                        Nr Rapporto: {selectedWorker.relationshipNumber}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4 mb-12">
-                  {(() => {
-                    const yearAccrued = payroll.filter(p => p.year === selectedYear).reduce((acc, p) => acc + p.thirteenth, 0);
-                    const yearPaidInPayroll = payroll.filter(p => p.year === selectedYear && p.isThirteenthPayment).reduce((acc, p) => acc + p.grossPay, 0);
-                    const saldoDaPagare = yearAccrued - yearPaidInPayroll;
-
-                    return (
-                      <>
-                        <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
-                          <span className="text-zinc-500">Tredicesima maturata nell'anno {selectedYear}</span>
-                          <span className="font-mono font-medium">{yearAccrued.toFixed(2)} €</span>
-                        </div>
-                        <div className="flex justify-between py-3 border-b border-zinc-50 text-sm">
-                          <span className="text-zinc-500">Acconti già corrisposti in busta paga</span>
-                          <span className="font-mono font-medium text-red-500">-{yearPaidInPayroll.toFixed(2)} €</span>
-                        </div>
-                        <div className="flex justify-between py-4 border-b border-zinc-100 text-lg font-black">
-                          <span>Saldo Tredicesima da Corrispondere</span>
-                          <span className="font-mono">{saldoDaPagare.toFixed(2)} €</span>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-
-                <div className="grid grid-cols-2 gap-12 mt-24">
-                  <div className="space-y-8">
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-400">Data e Luogo</div>
-                    <div className="border-b border-zinc-200 w-full h-8"></div>
-                  </div>
-                  <div className="space-y-8">
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-400 text-center">Firma per ricevuta</div>
-                    <div className="border-b border-zinc-200 w-full h-8"></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-8 flex justify-center print:hidden">
-                <button 
-                  onClick={() => window.print()}
-                  className="bg-black text-white px-8 py-4 rounded-xl font-medium flex items-center gap-2 hover:bg-zinc-800 transition-colors"
-                >
-                  <Printer className="w-5 h-5" />
-                  Stampa Cedolino Tredicesima
-                </button>
-              </div>
+              <PrintThirteenth 
+                selectedWorker={selectedWorker}
+                payroll={payroll}
+                selectedYear={selectedYear}
+                profile={profile}
+                setView={setView}
+                logo={logo}
+              />
             </motion.div>
           )}
 
@@ -1834,48 +974,16 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <h1 className="text-4xl font-light tracking-tight mb-8">Aggiungi Utente</h1>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-                  <h2 className="text-xl font-medium mb-6">Pre-approva Email Google</h2>
-                  <p className="text-sm text-zinc-500 mb-6">Inserisci solo l'email per permettere all'utente di accedere subito. Dovrà completare il profilo al primo accesso.</p>
-                  <form onSubmit={handleQuickAdd} className="space-y-4">
-                    {adminError && <div className="bg-red-50 text-red-500 p-3 rounded-xl text-xs">{adminError}</div>}
-                    {adminSuccess && <div className="bg-green-50 text-green-600 p-3 rounded-xl text-xs">{adminSuccess}</div>}
-                    <div>
-                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Email Google</label>
-                      <input required type="email" value={quickEmail} onChange={e => setQuickEmail(e.target.value)} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" placeholder="esempio@gmail.com" />
-                    </div>
-                    <button type="submit" className="w-full bg-black text-white rounded-xl py-3 font-medium hover:bg-zinc-800 transition-colors">Pre-approva Email</button>
-                  </form>
-                </div>
-
-                <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-                  <h2 className="text-xl font-medium mb-6">Profilo Completo</h2>
-                  <p className="text-sm text-zinc-500 mb-6">Crea un profilo completo per l'utente.</p>
-                  <form onSubmit={handleManualAdd} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Nome</label>
-                        <input required value={adminUserForm.name} onChange={e => setAdminUserForm({...adminUserForm, name: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
-                      </div>
-                      <div>
-                        <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Cognome</label>
-                        <input required value={adminUserForm.surname} onChange={e => setAdminUserForm({...adminUserForm, surname: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Email</label>
-                      <input required type="email" value={adminUserForm.email} onChange={e => setAdminUserForm({...adminUserForm, email: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black" />
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-widest text-zinc-400 mb-1">Codice Fiscale</label>
-                      <input required maxLength={16} value={adminUserForm.cf} onChange={e => setAdminUserForm({...adminUserForm, cf: e.target.value})} className="w-full bg-zinc-50 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-black uppercase" />
-                    </div>
-                    <button type="submit" className="w-full bg-zinc-100 text-zinc-600 rounded-xl py-3 font-medium hover:bg-zinc-200 transition-colors">Salva Profilo</button>
-                  </form>
-                </div>
-              </div>
+              <AdminAddUser 
+                onAdd={handleManualAdd}
+                onQuickAdd={handleQuickAdd}
+                adminError={adminError}
+                adminSuccess={adminSuccess}
+                quickEmail={quickEmail}
+                setQuickEmail={setQuickEmail}
+                adminUserForm={adminUserForm}
+                setAdminUserForm={setAdminUserForm}
+              />
             </motion.div>
           )}
 
@@ -1887,36 +995,10 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <h1 className="text-4xl font-light tracking-tight mb-8">Email Pre-autorizzate</h1>
-              <div className="space-y-6">
-                <div className="bg-white p-8 rounded-3xl border border-zinc-100">
-                  <h2 className="text-xs uppercase tracking-widest text-zinc-400 mb-6">Lista Pre-autorizzazioni ({preapprovedList.length})</h2>
-                  {preapprovedList.length === 0 ? (
-                    <div className="text-center py-12 italic text-zinc-400 text-sm">
-                      Nessuna email pre-autorizzata in lista.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-zinc-50">
-                      {preapprovedList.map((item, idx) => (
-                        <div key={idx} className="py-4 flex items-center justify-between group">
-                          <div>
-                            <p className="font-medium">{item.email}</p>
-                            <p className="text-[10px] text-zinc-400 uppercase tracking-wider">
-                              {item.name ? `${item.name} ${item.surname}` : 'Solo Email'} • Aggiunto il {new Date(item.addedAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <button 
-                            onClick={() => deletePreApproved(item.email)}
-                            className="p-2 text-zinc-300 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <AdminPreapproved 
+                preapprovedList={preapprovedList}
+                deletePreApproved={deletePreApproved}
+              />
             </motion.div>
           )}
 
@@ -1928,130 +1010,20 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               exit={{ opacity: 0, y: -10 }}
               className="max-w-4xl"
             >
-              <h1 className="text-4xl font-light tracking-tight mb-8">Utenti Profilati</h1>
-              {adminLoading ? (
-                <div className="flex justify-center py-20">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
-                </div>
-              ) : (
-                <div className="space-y-12">
-                  <section>
-                    <h2 className="text-xs uppercase tracking-widest text-zinc-400 mb-6">Utenti in attesa ({pendingUsers.length})</h2>
-                    {pendingUsers.length === 0 ? (
-                      <div className="bg-white rounded-3xl p-8 text-center border border-zinc-100 italic text-zinc-400 text-sm">
-                        Nessun utente in attesa.
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {pendingUsers.map(u => (
-                          <div key={u.uid || u.email} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center">
-                            <div>
-                              <h3 className="font-medium">{u.name} {u.surname}</h3>
-                              <p className="text-sm text-zinc-500">{u.email}</p>
-                              <p className="text-xs text-zinc-400 font-mono mt-1">{u.cf}</p>
-                            </div>
-                            <div className="flex gap-3">
-                              <button 
-                                onClick={() => toggleApproval(u.uid, u.email, true)}
-                                className="bg-black text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors"
-                              >
-                                Approva
-                              </button>
-                              {!isProtectedEmail(u.email) && (
-                                <button 
-                                  onClick={() => confirmDeleteUser(u.uid, u.email)}
-                                  className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-
-                  <section>
-                    <h2 className="text-xs uppercase tracking-widest text-zinc-400 mb-6">Utenti approvati ({approvedUsers.length})</h2>
-                    <div className="space-y-4">
-                      {approvedUsers.map(u => (
-                        <div key={u.uid || u.email} className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-100 flex justify-between items-center">
-                          <div>
-                            <h3 className="font-medium">{u.name} {u.surname}</h3>
-                            <p className="text-sm text-zinc-500">{u.email}</p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            {!isProtectedEmail(u.email) && (
-                              <>
-                                <button 
-                                  onClick={() => toggleRole(u.uid, u.email, u.role)}
-                                  className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${u.role === 'admin' ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                                >
-                                  {u.role === 'admin' ? 'Admin' : 'Rendi Admin'}
-                                </button>
-                                <button 
-                                  onClick={() => toggleApproval(u.uid, u.email, false)}
-                                  className="text-zinc-500 text-sm font-medium hover:underline"
-                                >
-                                  Revoca Accesso
-                                </button>
-                                <button 
-                                  onClick={() => confirmDeleteUser(u.uid, u.email)}
-                                  className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
-                            {isProtectedEmail(u.email) && (
-                              <span className="text-xs uppercase tracking-widest text-zinc-400 font-medium">Admin di Sistema</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                </div>
-              )}
-
-              {/* User Deletion Confirmation Modal */}
-              <AnimatePresence>
-                {userToDelete && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                  >
-                    <motion.div 
-                      initial={{ scale: 0.95, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.95, opacity: 0 }}
-                      className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl"
-                    >
-                      <h3 className="text-xl font-medium mb-4">Conferma Eliminazione</h3>
-                      <p className="text-zinc-500 mb-8">
-                        Sei sicuro di voler eliminare definitivamente l'utente <span className="font-medium text-black">{userToDelete.email}</span>? Tutti i suoi dati rimarranno nel database ma non potrà più accedere.
-                      </p>
-                      <div className="flex justify-end gap-3">
-                        <button 
-                          onClick={() => setUserToDelete(null)}
-                          className="px-6 py-3 rounded-xl text-sm font-medium text-zinc-600 hover:bg-zinc-100 transition-colors"
-                        >
-                          Annulla
-                        </button>
-                        <button 
-                          onClick={executeDeleteUser}
-                          className="bg-red-500 text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-red-600 transition-colors"
-                        >
-                          Elimina Utente
-                        </button>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <AdminUsers 
+                pendingUsers={pendingUsers}
+                approvedUsers={approvedUsers}
+                adminLoading={adminLoading}
+                toggleApproval={toggleApproval}
+                toggleRole={toggleRole}
+                confirmDeleteUser={confirmDeleteUser}
+                adminError={adminError}
+                adminSuccess={adminSuccess}
+                userToDelete={userToDelete}
+                setUserToDelete={setUserToDelete}
+                executeDeleteUser={executeDeleteUser}
+                isProtectedEmail={isProtectedEmail}
+              />
             </motion.div>
           )}
 
@@ -2062,76 +1034,15 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               animate={{ opacity: 1 }}
               className="max-w-3xl mx-auto"
             >
-              <button onClick={() => setView('worker')} className="text-zinc-400 hover:text-black mb-6 flex items-center gap-2 text-sm print:hidden">
-                ← Torna al lavoratore
-              </button>
-              
-              {(() => {
-                const totals = getAnnualTotals(selectedYear);
-                return (
-                  <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
-                    <div className="flex justify-between items-start mb-12">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
-                        <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                      </div>
-                      <div className="text-right">
-                        <h2 className="text-2xl font-bold uppercase tracking-tighter">Certificazione Unica</h2>
-                        <p className="text-sm text-zinc-500">Anno d'imposta: {selectedYear}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6 text-sm leading-relaxed mb-12 text-zinc-700">
-                      <p>Il sottoscritto <strong>{selectedWorker.employerName} {selectedWorker.employerSurname}</strong> (CF: {selectedWorker.employerCf}), in qualità di datore di lavoro,</p>
-                      <p>CERTIFICA che il lavoratore <strong>{selectedWorker.name} {selectedWorker.surname}</strong> (CF: {selectedWorker.cf}), rapporto nr. {selectedWorker.relationshipNumber}, livello <strong>{selectedWorker.level}{selectedWorker.isSuper ? ' Super' : ''}</strong>, ha percepito nell'anno {selectedYear} le seguenti somme:</p>
-                    </div>
-
-                    <div className="border border-zinc-100 rounded-3xl overflow-hidden mb-12">
-                      <div className="flex justify-between p-6 border-b border-zinc-50 bg-zinc-50/50">
-                        <span className="text-xs uppercase tracking-widest text-zinc-400">Descrizione</span>
-                        <span className="text-xs uppercase tracking-widest text-zinc-400">Importo</span>
-                      </div>
-                      <div className="flex justify-between p-6 border-b border-zinc-50 text-sm">
-                        <span>Somme erogate a titolo di retribuzione lorda</span>
-                        <span className="font-mono font-medium">{totals.totGross.toFixed(2)} €</span>
-                      </div>
-                      <div className="flex justify-between p-6 border-b border-zinc-50 text-sm">
-                        <span>Somme erogate a titolo di 13esima mensilità</span>
-                        <span className="font-mono font-medium">{totals.totThirteenth.toFixed(2)} €</span>
-                      </div>
-                      <div className="flex justify-between p-6 bg-black text-white font-bold">
-                        <span className="uppercase tracking-widest text-xs">Totale Reddito Lordo (CU)</span>
-                        <span className="font-mono text-lg">{totals.totalCU.toFixed(2)} €</span>
-                      </div>
-                    </div>
-
-                    <div className="p-6 bg-zinc-50 rounded-3xl mb-12 flex justify-between items-center">
-                      <span className="text-xs uppercase tracking-widest text-zinc-400">Accantonamento T.F.R. nell'anno</span>
-                      <span className="font-mono font-bold text-zinc-900">{totals.totTfr.toFixed(2)} €</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-12 mt-24">
-                      <div className="space-y-8">
-                        <div className="text-[10px] uppercase tracking-widest text-zinc-400">Data e Luogo</div>
-                        <div className="border-b border-zinc-200 w-full h-8"></div>
-                      </div>
-                      <div className="space-y-8">
-                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 text-center">Firma del Datore di Lavoro</div>
-                        <div className="border-b border-zinc-200 w-full h-8"></div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="mt-8 flex justify-center print:hidden">
-                <button 
-                  onClick={() => window.print()}
-                  className="bg-black text-white px-8 py-4 rounded-xl font-medium flex items-center gap-2 hover:bg-zinc-800 transition-colors"
-                >
-                  <Printer className="w-5 h-5" />
-                  Stampa Certificazione
-                </button>
-              </div>
+              <PrintCU 
+                selectedWorker={selectedWorker}
+                payroll={payroll}
+                selectedYear={selectedYear}
+                profile={profile}
+                setView={setView}
+                logo={logo}
+                getAnnualTotals={getAnnualTotals}
+              />
             </motion.div>
           )}
         </AnimatePresence>

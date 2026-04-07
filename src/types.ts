@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface UserProfile {
   uid: string;
   name: string;
@@ -69,6 +71,104 @@ export interface ThirteenthYearlyData {
   year: number;
   amount: number;
   isPaid: boolean;
+}
+
+export interface SidebarProps {
+  view: string;
+  setView: (view: string) => void;
+  isAdmin: boolean;
+  onSignOut: () => void;
+}
+
+export interface WorkerListProps {
+  workers: Worker[];
+  loading: boolean;
+  setView: (view: any) => void;
+  setSelectedWorker: (worker: Worker) => void;
+}
+
+export interface AddWorkerFormProps {
+  profile: UserProfile;
+  onAdd: (e: React.FormEvent) => Promise<void>;
+  onCancel: () => void;
+  formError: string | null;
+  setFormError: (error: string | null) => void;
+}
+
+export interface WorkerDetailProps {
+  selectedWorker: Worker;
+  payroll: PayrollEntry[];
+  tfrYearlyData: TfrYearlyData[];
+  holidayYearlyData: HolidayYearlyData[];
+  thirteenthYearlyData: ThirteenthYearlyData[];
+  setView: (view: string) => void;
+  setSelectedPayroll: (payroll: PayrollEntry) => void;
+  updateWorkerLevel: (level: 'A' | 'B' | 'C' | 'D', isSuper: boolean) => Promise<void>;
+  updateWorkerContract: (hours: number) => Promise<void>;
+  deleteWorker: (id: string) => Promise<void>;
+  deletePayroll: (id: string) => Promise<void>;
+  updateTfrYearly: (year: number, rate: number, isPaid: boolean) => Promise<void>;
+  updateThirteenthYearly: (year: number, amount: number, isPaid: boolean) => Promise<void>;
+  handleAddPayroll: (e: React.FormEvent) => Promise<void>;
+  showDeleteConfirm: string | null;
+  setShowDeleteConfirm: (id: string | null) => void;
+  selectedYear: number;
+  setSelectedYear: (year: number) => void;
+  newPayroll: any;
+  setNewPayroll: (data: any) => void;
+}
+
+export interface PrintPayslipProps {
+  selectedWorker: Worker;
+  selectedPayroll: PayrollEntry;
+  profile: UserProfile;
+  setView: (view: string) => void;
+  logo: string;
+}
+
+export interface PrintThirteenthProps {
+  selectedWorker: Worker;
+  payroll: PayrollEntry[];
+  selectedYear: number;
+  profile: UserProfile;
+  setView: (view: string) => void;
+  logo: string;
+}
+
+export interface AdminAddUserProps {
+  onAdd: (e: React.FormEvent) => Promise<void>;
+  onQuickAdd: (e: React.FormEvent) => Promise<void>;
+  adminError: string | null;
+  adminSuccess: string | null;
+  quickEmail: string;
+  setQuickEmail: (email: string) => void;
+  adminUserForm: any;
+  setAdminUserForm: (form: any) => void;
+}
+
+export interface AdminUsersProps {
+  pendingUsers: UserProfile[];
+  approvedUsers: UserProfile[];
+  adminLoading: boolean;
+  toggleApproval: (uid: string, email: string, status: boolean) => Promise<void>;
+  toggleRole: (uid: string, email: string, currentRole: 'user' | 'admin') => Promise<void>;
+  confirmDeleteUser: (uid: string, email: string) => void;
+  adminError: string | null;
+  adminSuccess: string | null;
+  userToDelete: { uid: string; email: string } | null;
+  setUserToDelete: (user: { uid: string; email: string } | null) => void;
+  executeDeleteUser: () => Promise<void>;
+  isProtectedEmail: (email: string) => boolean;
+}
+
+export interface PrintCUProps {
+  selectedWorker: Worker;
+  payroll: PayrollEntry[];
+  selectedYear: number;
+  profile: UserProfile;
+  setView: (view: string) => void;
+  logo: string;
+  getAnnualTotals: (year: number) => any;
 }
 
 export const MONTHS = [
