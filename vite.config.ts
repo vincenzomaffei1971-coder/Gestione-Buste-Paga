@@ -9,7 +9,7 @@ export default defineConfig(({mode}) => {
   return {
     // Se l'app viene ospitata su GitLab Pages (es. username.gitlab.io/project-name/),
     // decommenta la riga sotto e inserisci il nome del progetto:
-    base: '/',
+    base: process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/',
     plugins: [
       react(), 
       tailwindcss(),
