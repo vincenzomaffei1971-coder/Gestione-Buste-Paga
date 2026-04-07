@@ -1535,8 +1535,8 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
               
               <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
                 <div className="flex justify-between items-start mb-12">
-                  <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center print:bg-zinc-100 print:text-black">
-                    <Briefcase className="text-white w-6 h-6 print:text-black" />
+                  <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
+                    <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                   <div className="text-right">
                     <h2 className="text-2xl font-bold uppercase tracking-tighter">Prospetto Paga</h2>
@@ -1574,43 +1574,13 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                     <span className="text-zinc-500">Retribuzione oraria</span>
                     <span className="font-mono font-medium">{(selectedPayroll.hourlyRate || 0).toFixed(2)} €/h</span>
                   </div>
-                  <div className="flex justify-between py-4 border-b border-zinc-100 text-base font-bold">
-                    <span>Totale</span>
+                  <div className="flex justify-between py-4 border-b border-zinc-100 text-lg font-black">
+                    <span>Netto a Pagare</span>
                     <span className="font-mono">{(selectedPayroll.grossPay || 0).toFixed(2)} €</span>
                   </div>
-                  {selectedPayroll.includeWorkerContributionsInPayslip && (
-                    <div className="flex justify-between py-3 border-b border-zinc-50 text-sm italic text-zinc-600">
-                      <span>Quota contributi spettante al lavoratore</span>
-                      <span className="font-mono">-{(selectedPayroll.workerContributions || 0).toFixed(2)} €</span>
-                    </div>
-                  )}
-                  {selectedPayroll.includeWorkerContributionsInPayslip && (
-                    <div className="flex justify-between py-4 border-b border-zinc-100 text-lg font-black">
-                      <span>Netto a Pagare</span>
-                      <span className="font-mono">{( (selectedPayroll.grossPay || 0) - (selectedPayroll.workerContributions || 0) ).toFixed(2)} €</span>
-                    </div>
-                  )}
                 </div>
 
-                <div className="mb-12 grid grid-cols-2 gap-6">
-                  <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
-                    <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-4">Contributi INPS (€)</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-zinc-500">Quota Datore</span>
-                        <span className="font-mono font-medium">{(selectedPayroll.employerContributions || 0).toFixed(2)} €</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-zinc-500">Quota Lavoratore</span>
-                        <span className="font-mono font-medium">{(selectedPayroll.workerContributions || 0).toFixed(2)} €</span>
-                      </div>
-                      <div className="flex justify-between pt-2 border-t border-zinc-200 text-sm font-bold">
-                        <span>Totale da Versare</span>
-                        <span className="font-mono">{(selectedPayroll.totalContributions || 0).toFixed(2)} €</span>
-                      </div>
-                    </div>
-                  </div>
-
+                <div className="mb-12 grid grid-cols-1 gap-6">
                   <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
                     <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 mb-4">Riepilogo Ferie (h)</h4>
                     <div className="grid grid-cols-3 gap-2 text-center">
@@ -1899,8 +1869,8 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
                 return (
                   <div className="bg-white p-12 border border-zinc-200 shadow-sm font-sans text-black print:border-none print:shadow-none print:p-0">
                     <div className="flex justify-between items-start mb-12">
-                      <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center print:bg-zinc-100 print:text-black">
-                        <Briefcase className="text-white w-6 h-6 print:text-black" />
+                      <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center print:bg-zinc-100 print:text-black">
+                        <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                       <div className="text-right">
                         <h2 className="text-2xl font-bold uppercase tracking-tighter">Certificazione Unica</h2>
