@@ -54,7 +54,7 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-const logo = `${import.meta.env.BASE_URL}logo.png`;
+import logo from '/logo.png';
 
 // --- HELPERS ---
 
@@ -194,9 +194,22 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
+
+    // Basic network check
+    try {
+      const authDomain = (auth.app.options as any).authDomain;
+      const response = await fetch(`https://${authDomain}/__/__/auth/handler`, { mode: 'no-cors' });
+      console.log("Auth domain check:", response.type);
+    } catch (e) {
+      console.error("Auth domain check failed:", e);
+      setError('Impossibile raggiungere i server di autenticazione Firebase. Verifica la tua connessione o le impostazioni del firewall.');
+      setLoading(false);
+      return;
+    }
+
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({
       prompt: 'select_account'
@@ -211,11 +224,12 @@ const Login = () => {
         console.error("Login error:", err);
         if (err.code === 'auth/popup-blocked') {
           setError('Il popup di accesso è stato bloccato dal browser. Clicca sul link qui sotto per aprire l\'app in una nuova scheda e riprovare.');
-          setLoading(false);
+        } else if (err.code === 'auth/network-request-failed') {
+          setError('Errore di rete. Verifica la tua connessione o assicurati che il dominio sia autorizzato nella console Firebase (Authentication > Settings > Authorized domains).');
         } else {
-          setError('Errore durante l\'accesso con Google. Riprova.');
-          setLoading(false);
+          setError(`Errore durante l'accesso: ${err.message || 'Riprova.'}`);
         }
+        setLoading(false);
       });
   };
 
@@ -227,9 +241,12 @@ const Login = () => {
         className="bg-white p-8 rounded-3xl shadow-sm max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-6">
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-6 hover:opacity-80 transition-opacity"
+          >
             <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-          </div>
+          </button>
           <h1 className="text-3xl font-light tracking-tight mb-2">Gestionale Busta Paga</h1>
           <p className="text-zinc-500">Accedi con il tuo account Google</p>
         </div>
@@ -242,13 +259,32 @@ const Login = () => {
               className="bg-red-50 text-red-600 p-4 rounded-xl text-xs text-center border border-red-100 flex flex-col gap-2"
             >
               <p>{error}</p>
-              {error.includes('popup') && (
-                <button 
-                  onClick={() => window.open(window.location.href, '_blank')}
-                  className="text-red-700 font-bold underline"
-                >
-                  Apri in una nuova scheda
-                </button>
+              {(error.includes('popup') || error.includes('rete')) && (
+                <div className="flex flex-col gap-2">
+                  <button 
+                    onClick={() => window.open(window.location.href, '_blank')}
+                    className="text-red-700 font-bold underline"
+                  >
+                    Apri in una nuova scheda
+                  </button>
+                  <button 
+                    onClick={() => handleGoogleLogin()}
+                    className="text-red-700 font-bold underline"
+                  >
+                    Riprova
+                  </button>
+                  <a 
+                    href="https://status.firebase.google.com/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-red-700 font-bold underline"
+                  >
+                    Controlla lo stato di Firebase
+                  </a>
+                  <p className="mt-2 text-[10px] text-red-500">
+                    Se il problema persiste, assicurati che il dominio sia autorizzato nella console Firebase (Authentication > Settings > Authorized domains).
+                  </p>
+                </div>
               )}
             </motion.div>
           )}
@@ -797,12 +833,15 @@ const Dashboard = ({ user, profile }: { user: User, profile: UserProfile }) => {
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-zinc-100 flex flex-col print:hidden">
         <div className="p-6">
-          <div className="flex items-center gap-3 mb-8">
+          <button 
+            onClick={() => { setView('list'); setSelectedWorker(null); }}
+            className="flex items-center gap-3 mb-8 hover:opacity-80 transition-opacity group"
+          >
             <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center">
               <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
-            <span className="font-medium tracking-tight">Busta Paga Colf</span>
-          </div>
+            <span className="font-medium tracking-tight group-hover:text-zinc-600 transition-colors">Busta Paga Colf</span>
+          </button>
 
           <nav className="space-y-1">
             <button 
