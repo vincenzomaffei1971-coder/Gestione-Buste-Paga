@@ -55,7 +55,7 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import logo from './assets/logo.png';
+const logo = '/assets/logo.png';
 
 // Import refactored components
 import { Sidebar } from './components/Dashboard/Sidebar';
