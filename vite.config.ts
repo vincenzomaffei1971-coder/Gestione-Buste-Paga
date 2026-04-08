@@ -18,7 +18,7 @@ export default defineConfig(({mode}) => {
         injectRegister: 'auto',
         manifestFilename: 'manifest.json',
         filename: 'sw.js',
-        includeAssets: ['assets/logo.png'],
+        includeAssets: ['logo.png'],
         devOptions: {
           enabled: true,
           type: 'module',
@@ -36,29 +36,29 @@ export default defineConfig(({mode}) => {
           theme_color: '#000000',
           background_color: '#f5f5f5',
           display: 'standalone',
-          start_url: '.',
-          scope: '.',
+          start_url: './',
+          scope: './',
           icons: [
             {
-              src: 'assets/logo.png',
+              src: 'logo.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: 'assets/logo.png',
+              src: 'logo.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: 'assets/logo.png',
+              src: 'logo.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'maskable'
             },
             {
-              src: 'assets/logo.png',
+              src: 'logo.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'

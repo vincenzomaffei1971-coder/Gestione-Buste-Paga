@@ -55,7 +55,7 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-const logo = '/assets/logo.png';
+const logo = `${import.meta.env.BASE_URL}logo.png`.replace(/\/+/g, '/');
 
 // Import refactored components
 import { Sidebar } from './components/Dashboard/Sidebar';
@@ -1107,7 +1107,16 @@ function AppContent() {
   }, []);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      // Check if it's iOS
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      if (isIOS) {
+        alert("Per installare l'app su iOS: tocca il pulsante 'Condividi' nel browser e seleziona 'Aggiungi alla schermata Home'.");
+      } else {
+        alert("L'installazione non è supportata dal tuo browser o l'app è già installata.");
+      }
+      return;
+    }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {

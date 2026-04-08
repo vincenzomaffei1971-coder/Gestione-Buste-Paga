@@ -1,5 +1,5 @@
-import React from 'react';
-import { Printer } from 'lucide-react';
+import React, { useState } from 'react';
+import { Printer, Briefcase } from 'lucide-react';
 import { Worker, PayrollEntry, UserProfile } from '../../types';
 
 interface PrintCUProps {
@@ -13,6 +13,7 @@ interface PrintCUProps {
 }
 
 export const PrintCU = ({ selectedWorker, payroll, selectedYear, profile, setView, logo, getAnnualTotals }: PrintCUProps) => {
+  const [logoError, setLogoError] = useState(false);
   const yearData = payroll.filter(p => p.year === selectedYear);
   const totGross = yearData.reduce((acc, p) => acc + p.grossPay, 0);
   const totThirteenth = yearData.reduce((acc, p) => acc + p.thirteenth, 0);
@@ -29,7 +30,18 @@ export const PrintCU = ({ selectedWorker, payroll, selectedYear, profile, setVie
       <div className="bg-white p-12 rounded-3xl shadow-sm border border-zinc-100 print:shadow-none print:border-none print:p-0">
         <div className="flex justify-between items-start mb-12">
           <div className="flex items-center gap-4">
-            {logo && <img src={logo} alt="Logo" className="h-12 w-auto object-contain" referrerPolicy="no-referrer" />}
+            {logo && !logoError ? (
+              <img 
+                src={logo} 
+                alt="Logo" 
+                className="h-12 w-auto object-contain" 
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div className="h-12 w-12 bg-zinc-50 rounded-xl flex items-center justify-center">
+                <Briefcase className="w-6 h-6 text-zinc-400" />
+              </div>
+            )}
             <div>
               <h2 className="text-2xl font-bold mb-2">Dichiarazione Sostitutiva</h2>
               <p className="text-zinc-500 uppercase tracking-widest text-[10px] font-bold">Certificazione Unica — Anno {selectedYear}</p>

@@ -9,7 +9,8 @@ import {
   Download,
   Menu,
   X,
-  ChevronLeft
+  ChevronLeft,
+  Briefcase
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { UserProfile } from '../../types';
@@ -49,6 +50,8 @@ export const Sidebar = React.memo(({
   isSidebarCollapsed,
   onToggle
 }: SidebarProps) => {
+  const [logoError, setLogoError] = React.useState(false);
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -70,7 +73,16 @@ export const Sidebar = React.memo(({
               className="flex items-center gap-3 hover:opacity-80 transition-opacity group overflow-hidden"
             >
               <div className="w-10 h-10 min-w-[40px] rounded-xl overflow-hidden flex items-center justify-center bg-zinc-50">
-                <img src={logo} alt="Logo" className="w-full h-full object-contain" />
+                {!logoError ? (
+                  <img 
+                    src={logo} 
+                    alt="Logo" 
+                    className="w-full h-full object-contain" 
+                    onError={() => setLogoError(true)}
+                  />
+                ) : (
+                  <Briefcase className="w-6 h-6 text-zinc-400" />
+                )}
               </div>
               {!isSidebarCollapsed && (
                 <span className="font-medium tracking-tight group-hover:text-zinc-600 transition-colors truncate">Busta Paga Colf</span>
