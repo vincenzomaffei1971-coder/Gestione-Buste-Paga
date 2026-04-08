@@ -18,7 +18,8 @@ import {
   History,
   Search,
   UserPlus,
-  TrendingUp
+  TrendingUp,
+  Menu
 } from 'lucide-react';
 import { 
   GoogleAuthProvider,
@@ -54,7 +55,7 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import logo from './logo.png';
+const logo = '/logo.png';
 
 // Import refactored components
 import { Sidebar } from './components/Dashboard/Sidebar';
@@ -392,14 +393,17 @@ const Dashboard = ({
   user, 
   profile, 
   deferredPrompt, 
-  handleInstall 
+  handleInstall,
+  isInstalled
 }: { 
   user: User, 
   profile: UserProfile, 
   deferredPrompt: any, 
-  handleInstall: () => void 
+  handleInstall: () => void,
+  isInstalled: boolean
 }) => {
   const [isTestMode, setIsTestMode] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const actualIsAdmin = isProtectedEmail(user.email) || profile.role === 'admin';
   const isAdmin = actualIsAdmin && !isTestMode;
@@ -867,10 +871,20 @@ const Dashboard = ({
         logo={logo}
         canInstall={!!deferredPrompt}
         onInstall={handleInstall}
+        isInstalled={isInstalled}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-8 print:p-0 print:bg-white">
+      <main className="flex-1 overflow-auto p-8 print:p-0 print:bg-white relative">
+        {/* Mobile Toggle */}
+        <button 
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="lg:hidden fixed top-4 left-4 z-30 p-2 bg-white rounded-lg shadow-sm border border-zinc-100"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
         <AnimatePresence mode="wait">
           {view === 'list' && (
             <motion.div 
@@ -1078,8 +1092,12 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [isPreApproved, setIsPreApproved] = useState<boolean | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -1208,5 +1226,6 @@ function AppContent() {
     profile={profile} 
     deferredPrompt={deferredPrompt}
     handleInstall={handleInstall}
+    isInstalled={isInstalled}
   />;
 }
