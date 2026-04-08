@@ -55,7 +55,9 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-const logo = `${import.meta.env.BASE_URL}logo.png`.replace(/\/+/g, '/');
+import logoUrl from '../logo.png';
+
+const logo = logoUrl;
 
 // Import refactored components
 import { Sidebar } from './components/Dashboard/Sidebar';
@@ -255,10 +257,25 @@ const Login = () => {
       >
         <div className="text-center mb-8">
           <button 
-            onClick={() => window.location.reload()}
-            className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-6 hover:opacity-80 transition-opacity"
+            onClick={() => {
+              // Force clear cache and reload
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                  for (const registration of registrations) {
+                    registration.unregister();
+                  }
+                  caches.keys().then(names => {
+                    for (const name of names) caches.delete(name);
+                    window.location.reload();
+                  });
+                });
+              } else {
+                window.location.reload();
+              }
+            }}
+            className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-6 hover:opacity-80 transition-opacity bg-white shadow-sm border border-zinc-100"
           >
-            <img src={logo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+            <img src={logo} alt="Logo" className="w-full h-full object-contain" />
           </button>
           <h1 className="text-3xl font-light tracking-tight mb-2">Gestionale Busta Paga</h1>
           <p className="text-zinc-500">Accedi con il tuo account Google</p>
@@ -1095,6 +1112,24 @@ function AppContent() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    // PWA Update logic: Check for updates and clear old versions
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (const registration of registrations) {
+          registration.update();
+        }
+      });
+
+      // Listen for controller change (new SW taking over)
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+    }
+
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true);
     }

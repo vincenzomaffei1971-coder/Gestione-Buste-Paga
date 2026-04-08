@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
@@ -13,9 +14,35 @@ export default defineConfig(({mode}) => {
     plugins: [
       react(), 
       tailwindcss(),
+      {
+        name: 'serve-root-logo',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            if (req.url === '/logo.png') {
+              const fs = require('fs');
+              const path = require('path');
+              const logoPath = path.resolve(__dirname, 'logo.png');
+              if (fs.existsSync(logoPath)) {
+                res.setHeader('Content-Type', 'image/png');
+                res.end(fs.readFileSync(logoPath));
+                return;
+              }
+            }
+            next();
+          });
+        }
+      },
+      viteStaticCopy({
+        targets: [
+          {
+            src: 'logo.png',
+            dest: '.'
+          }
+        ]
+      }),
       VitePWA({
         registerType: 'autoUpdate',
-        injectRegister: 'auto',
+        injectRegister: 'inline',
         manifestFilename: 'manifest.json',
         filename: 'sw.js',
         includeAssets: ['logo.png'],
@@ -77,7 +104,7 @@ export default defineConfig(({mode}) => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };
