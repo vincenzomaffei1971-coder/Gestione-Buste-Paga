@@ -1,10 +1,8 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import fs from 'fs';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
@@ -15,34 +13,6 @@ export default defineConfig(({mode}) => {
     plugins: [
       react(), 
       tailwindcss(),
-      {
-        name: 'serve-root-logo',
-        configureServer(server) {
-          server.middlewares.use((req, res, next) => {
-            const url = req.url?.split('?')[0] || '';
-            const isLogoRequest = url.endsWith('/assets/logo.png');
-            
-            if (isLogoRequest) {
-              const logoPath = path.resolve(process.cwd(), 'assets/logo.png');
-              if (fs.existsSync(logoPath)) {
-                res.setHeader('Content-Type', 'image/png');
-                res.setHeader('Cache-Control', 'no-cache');
-                res.end(fs.readFileSync(logoPath));
-                return;
-              }
-            }
-            next();
-          });
-        }
-      },
-      viteStaticCopy({
-        targets: [
-          {
-            src: 'assets/logo.png',
-            dest: 'assets'
-          }
-        ]
-      }),
       VitePWA({
         registerType: 'autoUpdate',
         injectRegister: 'inline',
@@ -107,7 +77,7 @@ export default defineConfig(({mode}) => {
     },
     server: {
       fs: {
-        allow: ['.', 'assets']
+        allow: ['.']
       },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.

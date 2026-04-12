@@ -17,13 +17,13 @@ export const PrintThirteenth = ({ selectedWorker, payroll, selectedYear, profile
   const yearPaidInPayroll = payroll.filter(p => p.year === selectedYear && p.isThirteenthPayment).reduce((acc, p) => acc + p.grossPay, 0);
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto print-one-page">
       <button onClick={() => setView('worker')} className="text-zinc-400 hover:text-black mb-6 flex items-center gap-2 text-sm print:hidden">
         ← Torna al lavoratore
       </button>
       
-      <div className="bg-white p-12 rounded-3xl shadow-sm border border-zinc-100 print:shadow-none print:border-none print:p-0">
-        <div className="flex justify-between items-start mb-12">
+      <div className="bg-white p-12 rounded-3xl shadow-sm border border-zinc-100 print:shadow-none print:border-none print:p-0 print-container">
+        <div className="flex justify-between items-start mb-8 print:mb-6">
           <div className="flex items-center gap-4">
             {logo && !logoError ? (
               <img 
@@ -51,8 +51,8 @@ export const PrintThirteenth = ({ selectedWorker, payroll, selectedYear, profile
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-12 mb-12 pb-12 border-b border-zinc-100">
-          <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-12 mb-8 pb-8 border-b border-zinc-100 print:mb-6 print:pb-6 print:gap-8">
+          <div className="space-y-4 print:space-y-2">
             <h3 className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Datore di Lavoro</h3>
             <div className="text-sm">
               <p className="font-bold text-lg">{selectedWorker.employerName} {selectedWorker.employerSurname}</p>
@@ -69,10 +69,10 @@ export const PrintThirteenth = ({ selectedWorker, payroll, selectedYear, profile
           </div>
         </div>
 
-        <div className="space-y-12">
-          <div className="bg-zinc-50 rounded-3xl p-8">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-6">Dettaglio Tredicesima Mensilità</h3>
-            <div className="space-y-4">
+        <div className="space-y-8 print:space-y-4">
+          <div className="bg-zinc-50 rounded-3xl p-8 print:p-4">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4 print:mb-2">Dettaglio Tredicesima Mensilità</h3>
+            <div className="space-y-4 print:space-y-2">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-zinc-500">Tredicesima Maturata nell'anno</span>
                 <span className="font-medium">{yearAccrued.toFixed(2)}€</span>
@@ -96,12 +96,12 @@ export const PrintThirteenth = ({ selectedWorker, payroll, selectedYear, profile
           </div>
         </div>
 
-        <div className="mt-24 grid grid-cols-2 gap-24 text-center">
-          <div className="border-t border-zinc-200 pt-4">
-            <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-8">Firma del Datore</p>
+        <div className="mt-12 grid grid-cols-2 gap-24 text-center print:mt-8 print:gap-12">
+          <div className="border-t border-zinc-200 pt-4 print:pt-2">
+            <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-8 print:mb-4">Firma del Datore</p>
           </div>
-          <div className="border-t border-zinc-200 pt-4">
-            <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-8">Firma del Lavoratore</p>
+          <div className="border-t border-zinc-200 pt-4 print:pt-2">
+            <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-8 print:mb-4">Firma del Lavoratore</p>
           </div>
         </div>
       </div>
