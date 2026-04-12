@@ -19,10 +19,14 @@ export default defineConfig(({mode}) => {
         name: 'serve-root-logo',
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
-            if (req.url === '/assets/logo.png') {
+            const url = req.url?.split('?')[0] || '';
+            const isLogoRequest = url.endsWith('/assets/logo.png');
+            
+            if (isLogoRequest) {
               const logoPath = path.resolve(process.cwd(), 'assets/logo.png');
               if (fs.existsSync(logoPath)) {
                 res.setHeader('Content-Type', 'image/png');
+                res.setHeader('Cache-Control', 'no-cache');
                 res.end(fs.readFileSync(logoPath));
                 return;
               }
@@ -102,6 +106,9 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
+      fs: {
+        allow: ['.', 'assets']
+      },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

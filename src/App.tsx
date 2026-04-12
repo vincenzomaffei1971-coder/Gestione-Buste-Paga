@@ -55,9 +55,9 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import logoUrl from '../assets/logo.png';
+// import logoUrl from '../assets/logo.png'; // Removed import to use direct path
 
-const logo = logoUrl;
+const logo = `${import.meta.env.BASE_URL || '/'}assets/logo.png`.replace(/\/+/g, '/');
 
 // Import refactored components
 import { Sidebar } from './components/Dashboard/Sidebar';

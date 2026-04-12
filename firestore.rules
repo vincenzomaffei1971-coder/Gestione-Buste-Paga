@@ -52,8 +52,8 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-          ((request.auth.token.email == "vincenzomaffei1971@gmail.com" || request.auth.token.email == "vincenzo.maffei@gmail.com" || request.auth.token.email == "vincenzo.maffei-1971@gmail.com") && request.auth.token.email_verified == true)
+          request.auth.token.email in ["vincenzomaffei1971@gmail.com", "vincenzo.maffei@gmail.com", "vincenzo.maffei-1971@gmail.com"] ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
         );
     }
 
@@ -138,8 +138,11 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin() || (isAuthenticated() && resource.data.email == request.auth.token.email);
       allow create: if isOwner(uid) && isValidUser(request.resource.data) && 
-        (exists(/databases/$(database)/documents/preapproved_emails/$(request.auth.token.email)) || isAdmin()) &&
-        (request.resource.data.role == 'user' || isAdmin());
+        (
+          request.auth.token.email in ["vincenzomaffei1971@gmail.com", "vincenzo.maffei@gmail.com", "vincenzo.maffei-1971@gmail.com"] ||
+          exists(/databases/$(database)/documents/preapproved_emails/$(request.auth.token.email)) || 
+          isAdmin()
+        );
       allow update: if !isProtectedUser(uid) && ((isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.isApproved == resource.data.isApproved && request.resource.data.role == resource.data.role) || isAdmin());
       allow delete: if isAdmin() && !isProtectedUser(uid);
     }
