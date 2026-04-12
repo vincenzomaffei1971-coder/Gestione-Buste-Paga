@@ -92,14 +92,6 @@ export const PrintPayslip = ({ selectedWorker, selectedPayroll, profile, setView
 
           <div className="bg-zinc-50 rounded-3xl p-8">
             <div className="space-y-4">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-zinc-500">Retribuzione Lorda</span>
-                <span className="font-medium">{selectedPayroll.grossPay.toFixed(2)}€</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-zinc-500">Rateo Tredicesima</span>
-                <span className="font-medium">{selectedPayroll.thirteenth.toFixed(2)}€</span>
-              </div>
               {printOptions.tfr && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-zinc-500">Accantonamento TFR</span>
@@ -113,7 +105,7 @@ export const PrintPayslip = ({ selectedWorker, selectedPayroll, profile, setView
                 </div>
               )}
               <div className="pt-4 mt-4 border-t border-zinc-200 flex justify-between items-center">
-                <span className="text-lg font-bold">Netto in Busta</span>
+                <span className="text-lg font-bold">Lordo in busta paga</span>
                 <span className="text-2xl font-bold">
                   {(selectedPayroll.grossPay - (selectedPayroll.includeWorkerContributionsInPayslip ? selectedPayroll.workerContributions : 0)).toFixed(2)}€
                 </span>
