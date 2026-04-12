@@ -740,8 +740,28 @@ const Dashboard = ({
   };
 
   const deletePayroll = async (id: string) => {
+    const entryToDelete = payroll.find(p => p.id === id);
+    if (!entryToDelete || !selectedWorker) return;
+    
+    const year = entryToDelete.year;
+    
     try {
       await deleteDoc(doc(db, 'payroll', id));
+      
+      // Update holiday yearly summary after deletion
+      const remainingPayroll = payroll.filter(p => p.id !== id && p.year === year);
+      const accrued = remainingPayroll.reduce((acc, p) => acc + (p.holidayAccrued || 0), 0);
+      const taken = remainingPayroll.reduce((acc, p) => acc + (p.holidayTaken || 0), 0);
+      const balance = accrued - taken;
+      
+      const holidayId = `${selectedWorker.id}_${year}`;
+      await setDoc(doc(db, 'holiday_yearly', holidayId), {
+        workerId: selectedWorker.id,
+        year,
+        accrued,
+        taken,
+        balance
+      }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `payroll/${id}`);
     }

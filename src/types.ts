@@ -231,8 +231,8 @@ export function calculatePayroll(
   // TFR is calculated on (gross + thirteenth) / 13.5
   const tfr = (grossPay + thirteenth) / 13.5;
   
-  // Holiday accrual in hours: (weeksWorked * contractHoursPerWeek) / 12
-  const holidayAccrued = (weeksWorked * contractHoursPerWeek) / 12;
+  // Holiday accrual in hours: contractHoursPerWeek * 4.333 / 12
+  const holidayAccrued = (contractHoursPerWeek * 4.333) / 12;
   const holidayBalance = previousHolidayBalance + holidayAccrued - holidayTaken;
 
   const contributions = calculateContributions(hourlyRate, hoursWorked, weeksWorked);
