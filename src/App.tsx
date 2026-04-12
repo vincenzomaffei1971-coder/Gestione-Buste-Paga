@@ -450,7 +450,7 @@ const Dashboard = ({
   const [showDuplicatePayrollModal, setShowDuplicatePayrollModal] = useState(false);
   const [showPrintOptionsModal, setShowPrintOptionsModal] = useState(false);
   const [printOptions, setPrintOptions] = useState({
-    contributions: false,
+    contributions: true,
     tfr: false,
     holidays: true
   });
@@ -478,7 +478,7 @@ const Dashboard = ({
     weeksWorked: 4, 
     holidayTaken: 0, 
     isThirteenthPayment: false,
-    includeWorkerContributionsInPayslip: false
+    includeWorkerContributionsInPayslip: true
   });
   const [formError, setFormError] = useState<string | null>(null);
 

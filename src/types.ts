@@ -194,15 +194,15 @@ export function calculateContributions(hourlyRate: number, hoursWorked: number, 
     workerRate = 0.29;
   } else {
     // Wage brackets for up to 24 hours/week
-    if (hourlyRate <= 9.05) {
-      totalRate = 1.66;
-      workerRate = 0.41;
-    } else if (hourlyRate <= 11.01) {
-      totalRate = 1.88;
-      workerRate = 0.47;
+    if (hourlyRate <= 9.61) {
+      totalRate = 1.70;
+      workerRate = 0.43;
+    } else if (hourlyRate <= 11.70) {
+      totalRate = 1.92;
+      workerRate = 0.48;
     } else {
-      totalRate = 2.29;
-      workerRate = 0.57;
+      totalRate = 2.34;
+      workerRate = 0.59;
     }
   }
 
