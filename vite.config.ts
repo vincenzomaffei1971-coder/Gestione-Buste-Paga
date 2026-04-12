@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -18,10 +19,8 @@ export default defineConfig(({mode}) => {
         name: 'serve-root-logo',
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
-            if (req.url === '/logo.png') {
-              const fs = require('fs');
-              const path = require('path');
-              const logoPath = path.resolve(__dirname, 'logo.png');
+            if (req.url === '/assets/logo.png') {
+              const logoPath = path.resolve(process.cwd(), 'assets/logo.png');
               if (fs.existsSync(logoPath)) {
                 res.setHeader('Content-Type', 'image/png');
                 res.end(fs.readFileSync(logoPath));
@@ -35,8 +34,8 @@ export default defineConfig(({mode}) => {
       viteStaticCopy({
         targets: [
           {
-            src: 'logo.png',
-            dest: '.'
+            src: 'assets/logo.png',
+            dest: 'assets'
           }
         ]
       }),
@@ -45,7 +44,7 @@ export default defineConfig(({mode}) => {
         injectRegister: 'inline',
         manifestFilename: 'manifest.json',
         filename: 'sw.js',
-        includeAssets: ['logo.png'],
+        includeAssets: ['assets/logo.png'],
         devOptions: {
           enabled: true,
           type: 'module',
@@ -67,25 +66,25 @@ export default defineConfig(({mode}) => {
           scope: './',
           icons: [
             {
-              src: 'logo.png',
+              src: 'assets/logo.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: 'logo.png',
+              src: 'assets/logo.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: 'logo.png',
+              src: 'assets/logo.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'maskable'
             },
             {
-              src: 'logo.png',
+              src: 'assets/logo.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'
@@ -99,7 +98,7 @@ export default defineConfig(({mode}) => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(process.cwd(), '.'),
       },
     },
     server: {

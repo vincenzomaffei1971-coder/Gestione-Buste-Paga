@@ -55,7 +55,7 @@ import {
   UserProfile
 } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import logoUrl from '../logo.png';
+import logoUrl from '../assets/logo.png';
 
 const logo = logoUrl;
 
