@@ -41,6 +41,7 @@ interface WorkerDetailProps {
   setSelectedYear: (year: number) => void;
   newPayroll: any;
   setNewPayroll: (data: any) => void;
+  setShowPrintOptionsModal: (show: boolean) => void;
 }
 
 export const WorkerDetail = ({ 
@@ -63,7 +64,8 @@ export const WorkerDetail = ({
   selectedYear,
   setSelectedYear,
   newPayroll,
-  setNewPayroll
+  setNewPayroll,
+  setShowPrintOptionsModal
 }: WorkerDetailProps) => {
   return (
     <div className="space-y-8">
@@ -294,7 +296,7 @@ export const WorkerDetail = ({
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button 
-                            onClick={() => { setSelectedPayroll(entry); setView('print-payslip'); }}
+                            onClick={() => { setSelectedPayroll(entry); setShowPrintOptionsModal(true); }}
                             className="p-2 text-zinc-300 hover:text-black transition-colors"
                             title="Stampa Busta Paga"
                           >

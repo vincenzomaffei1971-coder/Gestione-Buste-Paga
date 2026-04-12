@@ -447,6 +447,15 @@ const Dashboard = ({
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
 
+  const [showDuplicatePayrollModal, setShowDuplicatePayrollModal] = useState(false);
+  const [showPrintOptionsModal, setShowPrintOptionsModal] = useState(false);
+  const [printOptions, setPrintOptions] = useState({
+    contributions: false,
+    tfr: false,
+    holidays: true
+  });
+  const [pendingPayrollData, setPendingPayrollData] = useState<any>(null);
+
   // Form states
   const [newWorker, setNewWorker] = useState({ 
     name: '', 
@@ -625,10 +634,25 @@ const Dashboard = ({
     }
   };
 
-  const handleAddPayroll = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddPayroll = async (e?: React.FormEvent, skipCheck = false) => {
+    if (e) e.preventDefault();
     if (!selectedWorker) return;
     
+    // Check for duplicate month/year
+    if (!skipCheck) {
+      const existingEntry = payroll.find(p => 
+        p.workerId === selectedWorker.id && 
+        p.month === newPayroll.month && 
+        p.year === newPayroll.year
+      );
+
+      if (existingEntry) {
+        setPendingPayrollData(existingEntry);
+        setShowDuplicatePayrollModal(true);
+        return;
+      }
+    }
+
     // Get previous holiday balance
     const workerPayroll = payroll.filter(p => p.workerId === selectedWorker.id);
     const sortedPayroll = [...workerPayroll].sort((a, b) => {
@@ -681,8 +705,23 @@ const Dashboard = ({
       }, { merge: true });
 
       setNewPayroll({ ...newPayroll, hoursWorked: 0, holidayTaken: 0, isThirteenthPayment: false });
+      setShowDuplicatePayrollModal(false);
+      setPendingPayrollData(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'payroll');
+    }
+  };
+
+  const handleReplacePayroll = async () => {
+    if (!pendingPayrollData) return;
+    try {
+      await deleteDoc(doc(db, 'payroll', pendingPayrollData.id));
+      setShowDuplicatePayrollModal(false);
+      setPendingPayrollData(null);
+      // Now add the new one skipping the check
+      await handleAddPayroll(undefined, true);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `payroll/${pendingPayrollData.id}`);
     }
   };
 
@@ -971,6 +1010,7 @@ const Dashboard = ({
                 setSelectedYear={setSelectedYear}
                 newPayroll={newPayroll}
                 setNewPayroll={setNewPayroll}
+                setShowPrintOptionsModal={setShowPrintOptionsModal}
               />
             </motion.div>
           )}
@@ -988,6 +1028,7 @@ const Dashboard = ({
                 profile={profile}
                 setView={setView}
                 logo={logo}
+                printOptions={printOptions}
               />
             </motion.div>
           )}
@@ -1088,6 +1129,99 @@ const Dashboard = ({
                 getAnnualTotals={getAnnualTotals}
               />
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Duplicate Payroll Modal */}
+        <AnimatePresence>
+          {showDuplicatePayrollModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
+              >
+                <h3 className="text-xl font-bold mb-4">Mese già presente</h3>
+                <p className="text-zinc-500 mb-8">
+                  Esiste già una busta paga per {newPayroll.month} {newPayroll.year}. 
+                  Vuoi sostituirla con i nuovi dati?
+                </p>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={handleReplacePayroll}
+                    className="flex-1 bg-black text-white rounded-xl py-3 font-medium hover:bg-zinc-800 transition-colors"
+                  >
+                    Sostituisci
+                  </button>
+                  <button 
+                    onClick={() => { setShowDuplicatePayrollModal(false); setPendingPayrollData(null); }}
+                    className="flex-1 bg-zinc-100 text-zinc-600 rounded-xl py-3 font-medium hover:bg-zinc-200 transition-colors"
+                  >
+                    Annulla
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Print Options Modal */}
+        <AnimatePresence>
+          {showPrintOptionsModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
+              >
+                <h3 className="text-xl font-bold mb-6">Opzioni di Stampa</h3>
+                <div className="space-y-4 mb-8">
+                  <label className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl cursor-pointer hover:bg-zinc-100 transition-colors">
+                    <span className="text-sm font-medium">Includi Contributi INPS</span>
+                    <input 
+                      type="checkbox"
+                      checked={printOptions.contributions}
+                      onChange={e => setPrintOptions({...printOptions, contributions: e.target.checked})}
+                      className="w-5 h-5 rounded border-zinc-300 text-black focus:ring-black"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl cursor-pointer hover:bg-zinc-100 transition-colors">
+                    <span className="text-sm font-medium">Includi Accantonamento TFR</span>
+                    <input 
+                      type="checkbox"
+                      checked={printOptions.tfr}
+                      onChange={e => setPrintOptions({...printOptions, tfr: e.target.checked})}
+                      className="w-5 h-5 rounded border-zinc-300 text-black focus:ring-black"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl cursor-pointer hover:bg-zinc-100 transition-colors">
+                    <span className="text-sm font-medium">Includi Riepilogo Ferie</span>
+                    <input 
+                      type="checkbox"
+                      checked={printOptions.holidays}
+                      onChange={e => setPrintOptions({...printOptions, holidays: e.target.checked})}
+                      className="w-5 h-5 rounded border-zinc-300 text-black focus:ring-black"
+                    />
+                  </label>
+                </div>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => { setShowPrintOptionsModal(false); setView('print-payslip'); }}
+                    className="flex-1 bg-black text-white rounded-xl py-3 font-medium hover:bg-zinc-800 transition-colors"
+                  >
+                    Genera Stampa
+                  </button>
+                  <button 
+                    onClick={() => setShowPrintOptionsModal(false)}
+                    className="flex-1 bg-zinc-100 text-zinc-600 rounded-xl py-3 font-medium hover:bg-zinc-200 transition-colors"
+                  >
+                    Annulla
+                  </button>
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </main>

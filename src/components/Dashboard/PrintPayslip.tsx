@@ -8,9 +8,14 @@ interface PrintPayslipProps {
   profile: UserProfile;
   setView: (view: any) => void;
   logo: string;
+  printOptions: {
+    contributions: boolean;
+    tfr: boolean;
+    holidays: boolean;
+  };
 }
 
-export const PrintPayslip = ({ selectedWorker, selectedPayroll, profile, setView, logo }: PrintPayslipProps) => {
+export const PrintPayslip = ({ selectedWorker, selectedPayroll, profile, setView, logo, printOptions }: PrintPayslipProps) => {
   const [logoError, setLogoError] = useState(false);
   return (
     <div className="max-w-4xl mx-auto">
@@ -95,10 +100,12 @@ export const PrintPayslip = ({ selectedWorker, selectedPayroll, profile, setView
                 <span className="text-zinc-500">Rateo Tredicesima</span>
                 <span className="font-medium">{selectedPayroll.thirteenth.toFixed(2)}€</span>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-zinc-500">Accantonamento TFR</span>
-                <span className="font-medium">{selectedPayroll.tfr.toFixed(2)}€</span>
-              </div>
+              {printOptions.tfr && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-zinc-500">Accantonamento TFR</span>
+                  <span className="font-medium">{selectedPayroll.tfr.toFixed(2)}€</span>
+                </div>
+              )}
               {selectedPayroll.includeWorkerContributionsInPayslip && (
                 <div className="flex justify-between items-center text-sm text-red-500">
                   <span>Contributi a carico lavoratore</span>
@@ -115,36 +122,40 @@ export const PrintPayslip = ({ selectedWorker, selectedPayroll, profile, setView
           </div>
 
           <div className="grid grid-cols-2 gap-8">
-            <div className="space-y-2">
-              <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Riepilogo Ferie</h4>
-              <div className="flex justify-between text-xs py-2 border-b border-zinc-100">
-                <span className="text-zinc-500">Maturate nel mese</span>
-                <span className="font-medium">{selectedPayroll.holidayAccrued.toFixed(2)}h</span>
+            {printOptions.holidays && (
+              <div className="space-y-2">
+                <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Riepilogo Ferie</h4>
+                <div className="flex justify-between text-xs py-2 border-b border-zinc-100">
+                  <span className="text-zinc-500">Maturate nel mese</span>
+                  <span className="font-medium">{selectedPayroll.holidayAccrued.toFixed(2)}h</span>
+                </div>
+                <div className="flex justify-between text-xs py-2 border-b border-zinc-100">
+                  <span className="text-zinc-500">Godute nel mese</span>
+                  <span className="font-medium text-red-500">{selectedPayroll.holidayTaken.toFixed(1)}h</span>
+                </div>
+                <div className="flex justify-between text-xs py-2">
+                  <span className="text-zinc-500 font-bold">Residuo Totale</span>
+                  <span className="font-bold text-emerald-600">{selectedPayroll.holidayBalance.toFixed(2)}h</span>
+                </div>
               </div>
-              <div className="flex justify-between text-xs py-2 border-b border-zinc-100">
-                <span className="text-zinc-500">Godute nel mese</span>
-                <span className="font-medium text-red-500">{selectedPayroll.holidayTaken.toFixed(1)}h</span>
+            )}
+            {printOptions.contributions && (
+              <div className="space-y-2">
+                <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Contributi INPS</h4>
+                <div className="flex justify-between text-xs py-2 border-b border-zinc-100">
+                  <span className="text-zinc-500">Quota Lavoratore</span>
+                  <span className="font-medium">{selectedPayroll.workerContributions.toFixed(2)}€</span>
+                </div>
+                <div className="flex justify-between text-xs py-2 border-b border-zinc-100">
+                  <span className="text-zinc-500">Quota Datore</span>
+                  <span className="font-medium">{selectedPayroll.employerContributions.toFixed(2)}€</span>
+                </div>
+                <div className="flex justify-between text-xs py-2">
+                  <span className="text-zinc-500 font-bold">Totale Contributi</span>
+                  <span className="font-bold">{selectedPayroll.totalContributions.toFixed(2)}€</span>
+                </div>
               </div>
-              <div className="flex justify-between text-xs py-2">
-                <span className="text-zinc-500 font-bold">Residuo Totale</span>
-                <span className="font-bold text-emerald-600">{selectedPayroll.holidayBalance.toFixed(2)}h</span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h4 className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Contributi INPS</h4>
-              <div className="flex justify-between text-xs py-2 border-b border-zinc-100">
-                <span className="text-zinc-500">Quota Lavoratore</span>
-                <span className="font-medium">{selectedPayroll.workerContributions.toFixed(2)}€</span>
-              </div>
-              <div className="flex justify-between text-xs py-2 border-b border-zinc-100">
-                <span className="text-zinc-500">Quota Datore</span>
-                <span className="font-medium">{selectedPayroll.employerContributions.toFixed(2)}€</span>
-              </div>
-              <div className="flex justify-between text-xs py-2">
-                <span className="text-zinc-500 font-bold">Totale Contributi</span>
-                <span className="font-bold">{selectedPayroll.totalContributions.toFixed(2)}€</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
